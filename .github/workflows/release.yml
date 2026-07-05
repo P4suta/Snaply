@@ -54,10 +54,9 @@ env:
   # Where to get the code: the release commit SHA when release-please dispatches us
   # (the tag doesn't exist yet); falls back to tag_name for a manual smoke test.
   REF: ${{ inputs.sha || inputs.tag_name }}
-  # The signer certificate's subject — asserted at verify time so a different
-  # (even validly-chained) certificate cannot pass silently. Set this to your
-  # SSL.com certificate's subject when you enable signing (see docs/SIGNING.md).
-  SIGNER_SUBJECT_CONTAINS: "CN=P4suta"
+  # NB: the signer subject lives in the `release` environment as the variable
+  # SIGNER_SUBJECT_CONTAINS (read at job level in `sign`/`publish`), so enabling
+  # signing is pure GitHub-UI config — no code edit. See docs/SIGNING.md.
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -137,6 +136,11 @@ jobs:
       # secrets.* cannot be referenced in `if:`; hoist presence to a job-level
       # env bool, then gate the signing steps on env.HAVE_SIGNING.
       HAVE_SIGNING: ${{ secrets.ES_USERNAME != '' && secrets.CREDENTIAL_ID != '' }}
+      # The signer certificate's subject — asserted at verify time so a different
+      # (even validly-chained) certificate cannot pass silently. Sourced from the
+      # `release` environment variable (this job runs in that environment), so it
+      # is configured in the GitHub UI, not in code. Fails closed if unset.
+      SIGNER_SUBJECT_CONTAINS: ${{ vars.SIGNER_SUBJECT_CONTAINS }}
     steps:
       # The Verify step uses a local composite action, so the repo tree must be
       # present. Runs first, before the artifact download, so checkout's clean
@@ -213,6 +217,10 @@ jobs:
       contents: write # create the GitHub Release + upload assets
       id-token: write # OIDC token for keyless Sigstore signing (attestations)
       attestations: write # write build-provenance + SBOM attestations
+    env:
+      # Same signer-subject assertion as the sign job, from the `release`
+      # environment variable — the publish gate re-verifies the bundle is signed.
+      SIGNER_SUBJECT_CONTAINS: ${{ vars.SIGNER_SUBJECT_CONTAINS }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
