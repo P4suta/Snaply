@@ -1,11 +1,15 @@
-namespace Snaply.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+
+namespace Snaply.Application;
 
 /// <summary>
 /// Central resolver for Snaply's per-user data directory and its subfolders under
 /// <c>%LOCALAPPDATA%\Snaply</c>. This is an unpackaged app, so we use the file system
 /// rather than <c>ApplicationData</c>. Settings, rolling logs, and crash dumps all live
-/// here so the location is consistent and easy to point a user at.
+/// here so the location is consistent and easy to point a user at. Shared by the WinUI
+/// app and the CLI so both write to the same place.
 /// </summary>
+[ExcludeFromCodeCoverage(Justification = "Environment/filesystem path resolver; infrastructure, not unit-tested.")]
 public static class AppPaths
 {
     /// <summary>The per-user root: <c>%LOCALAPPDATA%\Snaply</c>.</summary>

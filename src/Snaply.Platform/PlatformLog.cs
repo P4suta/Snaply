@@ -23,4 +23,7 @@ internal static partial class PlatformLog
 
     [LoggerMessage(EventId = 1004, Level = LogLevel.Error, Message = "Export failed ({Code}): {Reason}")]
     public static partial void ExportFailed(ILogger logger, string code, string reason, Exception exception);
+
+    [LoggerMessage(EventId = 1005, Level = LogLevel.Error, Message = "Loading image '{Path}' failed")]
+    public static partial void ImageLoadFailed(ILogger logger, string path, Exception exception);
 }

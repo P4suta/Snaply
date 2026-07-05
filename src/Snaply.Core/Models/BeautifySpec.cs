@@ -15,8 +15,21 @@ public sealed record BeautifySpec
     /// <summary>Breathing-room padding between the screenshot and the canvas edge.</summary>
     public Padding Padding { get; init; } = Padding.Uniform(64);
 
+    /// <summary>
+    /// When true (the default), the pipeline auto-derives <see cref="Padding"/> from the capture
+    /// size and ignores the literal above; set false to honour an explicit <see cref="Padding"/>
+    /// (e.g. the CLI's <c>--padding</c> / the MCP <c>padding</c> argument).
+    /// </summary>
+    public bool AutoPadding { get; init; } = true;
+
     /// <summary>Corner radius of the screenshot, in physical pixels. 0 == square.</summary>
     public double CornerRadius { get; init; } = 16;
+
+    /// <summary>
+    /// When true (the default), the pipeline auto-derives <see cref="CornerRadius"/> from the
+    /// capture size; set false to honour an explicit <see cref="CornerRadius"/>.
+    /// </summary>
+    public bool AutoCornerRadius { get; init; } = true;
 
     /// <summary>The drop shadow cast by the screenshot.</summary>
     public ShadowSpec Shadow { get; init; } = ShadowSpec.Default;

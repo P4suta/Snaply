@@ -20,6 +20,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Snaply.Core\Snaply.Core.csproj" />
+    <!-- The Application layer multi-targets net10.0, so its use cases (CapturePipeline,
+         BeautifySpecMapper) are unit-testable here with no display/GPU — the same
+         platform-independence goal that lets Core be tested on Linux CI. -->
+    <ProjectReference Include="..\..\src\Snaply.Application\Snaply.Application.csproj" />
   </ItemGroup>
 
 </Project>

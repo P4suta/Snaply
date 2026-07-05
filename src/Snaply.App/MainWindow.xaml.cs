@@ -49,7 +49,7 @@ public sealed partial class MainWindow : Window
     }
 
     private static double ReadTokenDouble(string key, double fallback) =>
-        Application.Current.Resources.TryGetValue(key, out object? value) && value is double d
+        Microsoft.UI.Xaml.Application.Current.Resources.TryGetValue(key, out object? value) && value is double d
             ? d
             : fallback;
 }

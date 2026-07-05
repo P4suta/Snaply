@@ -17,7 +17,7 @@ namespace Snaply;
 /// Also installs the global exception safety net (UI / AppDomain / TaskScheduler) so no
 /// failure goes unlogged or crashes the app silently.
 /// </summary>
-public partial class App : Application
+public partial class App : Microsoft.UI.Xaml.Application
 {
     private ITrayService? _tray;
     private IHotkeyService? _hotkey;

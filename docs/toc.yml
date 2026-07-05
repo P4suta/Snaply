@@ -2,6 +2,10 @@
   href: index.md
 - name: Architecture
   href: ARCHITECTURE.md
+- name: CLI
+  href: CLI.md
+- name: MCP server
+  href: MCP.md
 - name: Releasing
   href: RELEASING.md
 - name: Signing

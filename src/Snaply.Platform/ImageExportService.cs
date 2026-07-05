@@ -78,6 +78,12 @@ public sealed class ImageExportService : IExportService
             var package = new DataPackage();
             package.SetBitmap(RandomAccessStreamReference.CreateFromStream(stream));
             Clipboard.SetContent(package);
+
+            // Flush renders the delay-rendered bitmap into the OS clipboard now, so it survives this
+            // process exiting. Without it the short-lived CLI (`snaply capture --clipboard`) would
+            // report success yet leave nothing to paste once its process — the delay-render source —
+            // is gone. Flush must run on this same STA/UI thread.
+            Clipboard.Flush();
             return Result.Ok();
         }
         catch (OperationCanceledException)
@@ -88,6 +94,35 @@ public sealed class ImageExportService : IExportService
         {
             PlatformLog.ExportFailed(_logger, ErrorCodes.ExportClipboard, ex.Message, ex);
             return Result.Fail(ErrorCodes.ExportClipboard, ex.Message, ex);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<byte[]>> EncodePngAsync(CapturedImage image, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using CanvasBitmap bitmap = CreateBitmap(image);
+            using var stream = new InMemoryRandomAccessStream();
+            await bitmap.SaveAsync(stream, CanvasBitmapFileFormat.Png).AsTask(cancellationToken).ConfigureAwait(false);
+
+            var bytes = new byte[stream.Size];
+            using (var reader = new DataReader(stream.GetInputStreamAt(0)))
+            {
+                await reader.LoadAsync((uint)stream.Size).AsTask(cancellationToken).ConfigureAwait(false);
+                reader.ReadBytes(bytes);
+            }
+
+            return Result<byte[]>.Ok(bytes);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            PlatformLog.ExportFailed(_logger, ErrorCodes.ExportSave, ex.Message, ex);
+            return Result<byte[]>.Fail(ErrorCodes.ExportSave, ex.Message, ex);
         }
     }
 

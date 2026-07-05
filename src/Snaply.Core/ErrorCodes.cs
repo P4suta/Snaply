@@ -36,4 +36,13 @@ public static class ErrorCodes
 
     /// <summary>A re-render was requested before anything had been captured.</summary>
     public const string PipelineNoCapture = "pipeline.nocapture";
+
+    /// <summary>A command-line / tool argument could not be parsed or was out of range.</summary>
+    public const string InputInvalid = "input.invalid";
+
+    /// <summary>A capture was requested but consent for it was not granted (MCP capture scope).</summary>
+    public const string ConsentDenied = "consent.denied";
+
+    /// <summary>An output was required (e.g. a file path in machine mode) but none was supplied.</summary>
+    public const string OutputMissing = "output.missing";
 }

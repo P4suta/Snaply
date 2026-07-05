@@ -74,6 +74,13 @@ Write-Host '==> Publishing app (self-contained) into app/'
 dotnet publish src/Snaply.App/Snaply.App.csproj -c Release -r win-x64 -o $appDir @versionArgs
 if ($LASTEXITCODE -ne 0) { throw "app publish failed ($LASTEXITCODE)" }
 
+# The scriptable CLI + MCP host (snaply.exe) ships in the same app/ folder: it shares the
+# Windows App SDK runtime and the Core/Application/Platform DLLs already there, and carries
+# its own snaply.deps.json / runtimeconfig, so the two apphosts coexist without conflict.
+Write-Host '==> Publishing CLI (self-contained) into app/'
+dotnet publish src/Snaply.Cli/Snaply.Cli.csproj -c Release -r win-x64 -o $appDir @versionArgs
+if ($LASTEXITCODE -ne 0) { throw "cli publish failed ($LASTEXITCODE)" }
+
 Write-Host '==> Publishing launcher (Native AOT)'
 dotnet publish src/Snaply.Launcher/Snaply.Launcher.csproj -c Release -r win-x64 -o $launcherOut @versionArgs
 if ($LASTEXITCODE -ne 0) { throw "launcher publish failed ($LASTEXITCODE)" }
@@ -99,13 +106,16 @@ To start: double-click  Snaply.exe  (in this folder).
 
 The "app" folder holds the application and its bundled runtime — keep it next to
 Snaply.exe. Nothing needs to be installed; this build is self-contained.
+
+Command line & AI: app\snaply.exe is the scriptable CLI and MCP server
+(e.g.  app\snaply.exe capture full --out shot.png  or  app\snaply.exe mcp serve).
 '@
 Set-Content -Path (Join-Path $distRoot 'README.txt') -Value $readme -Encoding UTF8
 
 } # end if (-not $SkipBuild)
 
 Write-Host '==> Self-verifying bundle'
-$required = @((Join-Path $distRoot 'Snaply.exe'), (Join-Path $appDir 'Snaply.App.exe'))
+$required = @((Join-Path $distRoot 'Snaply.exe'), (Join-Path $appDir 'Snaply.App.exe'), (Join-Path $appDir 'snaply.exe'))
 $missing = @($required | Where-Object { -not (Test-Path $_) })
 if ($missing.Count -gt 0) { throw "bundle is missing: $($missing -join ', ')" }
 

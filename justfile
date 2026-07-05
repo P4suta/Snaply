@@ -87,6 +87,28 @@ fmt:
 fmt-check:
     mise exec -- dotnet format Snaply.slnx --verify-no-changes
 
+# ── CLI & MCP ──────────────────────────────────────────────────────────────
+
+# Build the snaply CLI (x64).
+cli-build:
+    mise exec -- dotnet build src/Snaply.Cli/Snaply.Cli.csproj -p:Platform=x64
+
+# Build then run the CLI; pass args after `--` (e.g. `just cli -- capture full --out x.png`).
+cli *args:
+    mise exec -- dotnet run --project src/Snaply.Cli/Snaply.Cli.csproj -p:Platform=x64 -- {{args}}
+
+# Start the MCP server (stdio) for local testing. Add `-- --transport http` for Streamable HTTP.
+mcp *args:
+    mise exec -- dotnet run --project src/Snaply.Cli/Snaply.Cli.csproj -p:Platform=x64 -- mcp serve {{args}}
+
+# Diagnose the local toolchain (mise / dotnet SDK / winapp / capture runtime).
+doctor:
+    mise exec -- dotnet run --project src/Snaply.Cli/Snaply.Cli.csproj -p:Platform=x64 -- doctor
+
+# Regenerate all shell completion scripts into build/completions (the CLI does the work).
+completions:
+    mise exec -- dotnet run --project src/Snaply.Cli/Snaply.Cli.csproj -p:Platform=x64 -- completions --all --out build/completions
+
 # ── Housekeeping ───────────────────────────────────────────────────────────
 
 # Remove build outputs.

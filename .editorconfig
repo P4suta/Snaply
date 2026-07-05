@@ -137,6 +137,12 @@ generated_code = true
 [obj/**]
 generated_code = true
 
+# Windows App SDK ships auto-initializer .cs files (bootstrap + undocked reg-free WinRT)
+# that it compiles into self-contained unpackaged Exes. They are SDK-generated, not ours,
+# so they must not be held to our analyzer bar (e.g. CA5392 on their P/Invokes).
+[*-AutoInitializer.cs]
+generated_code = true
+
 # ── Tests: xunit/test idioms trip a few design/naming rules that do not apply.
 [tests/Snaply.Tests/**.cs]
 # Test code uses idioms the app/library rules flag; relaxed for tests only.

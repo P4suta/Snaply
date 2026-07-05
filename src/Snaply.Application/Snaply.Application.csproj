@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Multi-target: a plain net10.0 face so the headless use cases (CapturePipeline,
+         BeautifySpecMapper, SettingsStore) stay unit-testable from tests/Snaply.Tests
+         on any OS, plus a net10.0-windows face for the WinUI app / CLI to reference.
+         The code here touches NO WinRT/Win2D — that is the architectural guardrail:
+         this layer depends on Snaply.Core only, never on Snaply.Platform or WinUI. -->
+    <TargetFrameworks>net10.0;net10.0-windows10.0.26100.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Restore/resolve the Windows TFM even on non-Windows CI (dependency scans). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- DI + logging composition shared by the App and CLI composition roots. Serilog
+         (file sink for both hosts, console sink for the CLI) is configured here so the
+         rolling-JSON diagnostics story is identical everywhere. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Snaply.Core\Snaply.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,9 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
-using Snaply.Diagnostics;
 
-namespace Snaply.Services;
+namespace Snaply.Application;
 
 /// <summary>
 /// Loads and saves the shared <see cref="AppSettings"/> document at
@@ -11,6 +11,7 @@ namespace Snaply.Services;
 /// the file system rather than <c>ApplicationData</c>). Saves are read-modify-write so
 /// each service's field survives; persistence is best-effort and never throws to callers.
 /// </summary>
+[ExcludeFromCodeCoverage(Justification = "Filesystem-backed settings I/O (fixed %LOCALAPPDATA% path); infrastructure, not unit-tested.")]
 public sealed class SettingsStore
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -48,7 +49,7 @@ public sealed class SettingsStore
             // Corrupt or unreadable settings: fall back to defaults, but record why.
             if (Logger is not null)
             {
-                AppLog.SettingsReadFailed(Logger, ex);
+                ApplicationLog.SettingsReadFailed(Logger, ex);
             }
         }
 
@@ -79,7 +80,7 @@ public sealed class SettingsStore
             // Persistence is best-effort; a failed write must not crash the app, but record it.
             if (Logger is not null)
             {
-                AppLog.SettingsWriteFailed(Logger, ex);
+                ApplicationLog.SettingsWriteFailed(Logger, ex);
             }
         }
     }

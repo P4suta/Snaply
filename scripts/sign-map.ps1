@@ -16,7 +16,11 @@
 #>
 
 # Ordered so the layout reads root-first, then app/.
+# Note: the root launcher (Snaply.exe) and the CLI apphost (app/snaply.exe) differ only by
+# case, which would collide as flat stage names on a case-insensitive filesystem — so the CLI
+# stages under a distinct name (Snaply.Cli.exe).
 $script:SnaplyFirstPartyPes = [ordered]@{
     'Snaply.exe'         = 'Snaply.exe'
     'app/Snaply.App.exe' = 'Snaply.App.exe'
+    'app/snaply.exe'     = 'Snaply.Cli.exe'
 }

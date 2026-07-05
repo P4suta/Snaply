@@ -65,7 +65,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Snaply.Core\Snaply.Core.csproj" />
+    <ProjectReference Include="..\Snaply.Application\Snaply.Application.csproj" />
     <ProjectReference Include="..\Snaply.Platform\Snaply.Platform.csproj" />
+  </ItemGroup>
+
+  <!-- The shared use-case layer (CapturePipeline, SettingsStore, AppSettings, AppPaths,
+       AppTheme/AppLanguage) moved out of this project into Snaply.Application. A project-wide
+       global using keeps the many call sites (ViewModels, services, dialogs) unchanged. -->
+  <ItemGroup>
+    <Using Include="Snaply.Application" />
   </ItemGroup>
 
   <!-- Publish Properties -->
