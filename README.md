@@ -37,6 +37,9 @@ decade of WinForms baggage; Snaply is a clean-room take on the same job.
 - **Global hotkeys + system tray** — `PrintScreen` for region, `Ctrl+Shift+2`
   for full screen; runs quietly in the tray.
 - **Save or copy** — PNG to disk or straight to the clipboard.
+- **Scriptable `snaply` CLI + Model Context Protocol server** — capture and
+  auto-beautify from the command line, pipe PNG bytes into CI, or let an AI
+  assistant drive captures over MCP.
 - **Fully localised** — English, 日本語, and 简体中文 (WinUI resources + MRT).
 - **Fluent theming** — System / Light / Dark, with automatic High Contrast.
 
@@ -90,6 +93,19 @@ just publish            # assemble the self-contained bundle → build/dist/Snap
 
 **Prerequisites:** Windows 11, the Windows App SDK runtime (bundled in the
 published build — the app ships self-contained and unpackaged).
+
+### CLI & MCP
+
+The same capture + beautify pipeline is available headless via the `snaply`
+CLI and as a Model Context Protocol server for AI assistants.
+
+```sh
+just cli -- capture full --out shot.png   # capture & beautify from the shell
+snaply mcp serve --allow-capture          # expose capture tools over MCP
+```
+
+See [docs/CLI.md](docs/CLI.md) for the full command tree and
+[docs/MCP.md](docs/MCP.md) for the MCP tools and consent model.
 
 ## Download
 

@@ -20,12 +20,6 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 2003, Level = LogLevel.Error, Message = "Unobserved task exception")]
     public static partial void UnobservedTaskException(ILogger logger, Exception exception);
 
-    [LoggerMessage(EventId = 2004, Level = LogLevel.Warning, Message = "Reading settings failed; falling back to defaults")]
-    public static partial void SettingsReadFailed(ILogger logger, Exception exception);
-
-    [LoggerMessage(EventId = 2005, Level = LogLevel.Warning, Message = "Writing settings failed; the change was not persisted")]
-    public static partial void SettingsWriteFailed(ILogger logger, Exception exception);
-
     [LoggerMessage(EventId = 2006, Level = LogLevel.Warning, Message = "Global hotkey unavailable for '{Chord}': {Reason}")]
     public static partial void HotkeyUnavailable(ILogger logger, string chord, string reason);
 

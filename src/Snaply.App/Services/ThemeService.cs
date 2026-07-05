@@ -2,19 +2,6 @@ using Microsoft.UI.Xaml;
 
 namespace Snaply.Services;
 
-/// <summary>The user-selectable app theme. <see cref="System"/> follows the OS.</summary>
-public enum AppTheme
-{
-    /// <summary>Follow the OS theme.</summary>
-    System,
-
-    /// <summary>Force the light theme.</summary>
-    Light,
-
-    /// <summary>Force the dark theme.</summary>
-    Dark,
-}
-
 /// <summary>
 /// Applies a manual theme override to the window's root content and persists the
 /// choice through the shared <see cref="SettingsStore"/>

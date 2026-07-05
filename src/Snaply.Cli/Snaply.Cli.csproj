@@ -1,0 +1,83 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Console executable: the product CLI (`snaply`) and the `mcp serve` subcommand.
+         Exe (not WinExe) so stdio and a console window work. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Snaply.Cli</RootNamespace>
+    <AssemblyName>snaply</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- Unpackaged + self-contained, mirroring Snaply.App: the CLI carries its own
+         Windows App SDK runtime because WGC capture and Win2D rendering need it
+         initialized in-process. Not packaged, no MSIX. -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Consume WinUI/Win2D runtime assets (Microsoft.UI.Dispatching, Win2D) the same
+         way the Platform layer does — but this project has NO XAML, so keep our own
+         [STAThread] Main as the entry point and don't scan for XAML items. -->
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <EnableDefaultXamlItems>false</EnableDefaultXamlItems>
+    <DISABLE_XAML_GENERATED_MAIN>true</DISABLE_XAML_GENERATED_MAIN>
+
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Required by the source-generated [LibraryImport] Win32 message-pump P/Invokes. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- The Windows App SDK injects auto-initializer .cs files (bootstrap + undocked
+         reg-free WinRT) into self-contained unpackaged *console* Exes (WinUI apps get
+         initialized via their generated Main instead, so they never compile these).
+         Those SDK files live under the NuGet cache — outside this repo's .editorconfig
+         reach — and trip our strict interop analyzers. Suppress only those rules here;
+         our own P/Invokes still carry [DefaultDllImportSearchPaths]. -->
+    <NoWarn>$(NoWarn);CA5392;CA1401;CA1060;CA1838</NoWarn>
+
+    <!-- Cli -> Platform -> Win2D/WindowsAppSDK is reflection-heavy: trimming/AOT are
+         unsafe here (they are for the app too). Native AOT stays with Snaply.Launcher. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CLI parsing (System.CommandLine) + rich terminal rendering (Spectre.Console). -->
+    <PackageReference Include="System.CommandLine" Version="2.0.9" />
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
+    <!-- Official Model Context Protocol C# SDK: `mcp serve` exposes both a classic stdio
+         transport (for local desktop clients) and the modern Streamable HTTP transport
+         (ModelContextProtocol.AspNetCore) for networked/remote AI clients. -->
+    <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
+    <!-- Microsoft.Extensions.Hosting / DependencyInjection / Logging are provided by the
+         Microsoft.AspNetCore.App shared framework referenced below, so they are not listed
+         here (NU1510 flags them as redundant under this repo's strict settings). -->
+    <!-- The Windows App SDK metapackage supplies Microsoft.UI.Dispatching (the STA
+         DispatcherQueue) and, with the Platform reference, the Win2D runtime. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
+  </ItemGroup>
+
+  <!-- The Streamable HTTP MCP transport hosts an ASP.NET Core endpoint. This is a plain
+       console Exe (Microsoft.NET.Sdk), so the ASP.NET Core shared framework must be referenced
+       explicitly rather than via the Web SDK. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Snaply.Core\Snaply.Core.csproj" />
+    <ProjectReference Include="..\Snaply.Application\Snaply.Application.csproj" />
+    <ProjectReference Include="..\Snaply.Platform\Snaply.Platform.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -37,6 +37,24 @@ Before adding code, make sure it respects the boundaries:
 When a design decision is ambiguous, choose beauty, separation, and
 testability.
 
+## CLI & MCP dev loop
+
+The `snaply` CLI and the MCP server both live in `src/Snaply.Cli` and share
+their use cases (capture pipeline, beautify mapping, settings) through
+`src/Snaply.Application` — never reach into `Snaply.Platform` from here. Run the
+health check first, then iterate:
+
+```sh
+just cli -- doctor                       # toolchain + capture-runtime health check
+just cli-build                           # build the CLI
+just cli -- capture full --out test.png  # exercise a capture end-to-end
+just mcp                                  # smoke the stdio MCP server
+```
+
+New public API in `Snaply.Cli` (and everywhere else) needs XML doc comments —
+`TreatWarningsAsErrors` turns missing-doc `CS1591` into a build failure, so
+document types and members as you add them.
+
 ## Code style & analyzers
 
 The whole solution builds with `TreatWarningsAsErrors` and a strict analyzer

@@ -1,6 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Snaply.App/Snaply.App.csproj" />
+    <Project Path="src/Snaply.Application/Snaply.Application.csproj" />
+    <Project Path="src/Snaply.Cli/Snaply.Cli.csproj">
+      <Platform Project="x64" />
+    </Project>
     <Project Path="src/Snaply.Core/Snaply.Core.csproj" />
     <Project Path="src/Snaply.Launcher/Snaply.Launcher.csproj">
       <Platform Project="x64" />

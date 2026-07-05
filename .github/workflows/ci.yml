@@ -100,6 +100,10 @@ jobs:
       # — the compiler is the lint gate. Platform=x64 (App/Platform default).
       - name: Build app (Release, x64)
         run: mise exec -- dotnet build src/Snaply.App/Snaply.App.csproj -c Release -p:Platform=x64 --no-restore
+      # Same gate for the CLI + MCP host (Snaply.Cli): the compiler + strict analyzers
+      # over the System.CommandLine / Spectre / MCP code and the shared Application layer.
+      - name: Build CLI (Release, x64)
+        run: mise exec -- dotnet build src/Snaply.Cli/Snaply.Cli.csproj -c Release -p:Platform=x64 --no-restore
       # Whole-solution formatting check (.editorconfig). Runs on windows so the
       # net10.0-windows projects load.
       - name: Format check

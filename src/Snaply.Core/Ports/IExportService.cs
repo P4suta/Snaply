@@ -21,4 +21,13 @@ public interface IExportService
     /// <param name="cancellationToken">Cancels the copy.</param>
     /// <returns>Success, or a failure.</returns>
     Task<Result> CopyToClipboardAsync(CapturedImage image, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Encode the image as a PNG and return the bytes (no file written). Used by the CLI's
+    /// <c>--stdout</c> pipe output and the MCP server's base64 image tool result.
+    /// </summary>
+    /// <param name="image">The image to encode.</param>
+    /// <param name="cancellationToken">Cancels the encode.</param>
+    /// <returns>The PNG bytes, or a failure.</returns>
+    Task<Result<byte[]>> EncodePngAsync(CapturedImage image, CancellationToken cancellationToken = default);
 }

@@ -8,6 +8,10 @@ see the [README](https://github.com/P4suta/Snaply#readme).
 
 - **[Architecture](ARCHITECTURE.md)** — the ports & adapters layering and the
   rules that keep `Snaply.Core` platform-independent.
+- **[CLI](CLI.md)** — the scriptable `snaply` command-line interface (capture,
+  beautify, list, doctor) with a machine-readable `--json` mode.
+- **[MCP server](MCP.md)** — the Model Context Protocol server that lets AI
+  assistants capture and auto-beautify screenshots (stdio + Streamable HTTP).
 - **[Releasing](RELEASING.md)** — how a version is cut (release-please →
   build → sign → publish).
 - **[Signing](SIGNING.md)** — the Authenticode signing setup and how to

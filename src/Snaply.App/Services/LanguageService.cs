@@ -2,22 +2,6 @@ using Microsoft.Windows.Globalization;
 
 namespace Snaply.Services;
 
-/// <summary>The user-selectable display language. <see cref="System"/> follows the OS.</summary>
-public enum AppLanguage
-{
-    /// <summary>Follow the operating system's display languages (MRT picks the best match).</summary>
-    System,
-
-    /// <summary>English (en-US).</summary>
-    English,
-
-    /// <summary>Japanese (ja-JP).</summary>
-    Japanese,
-
-    /// <summary>Simplified Chinese (zh-Hans).</summary>
-    Chinese,
-}
-
 /// <summary>
 /// Persists the display-language choice and applies it as the process-wide
 /// <see cref="ApplicationLanguages.PrimaryLanguageOverride"/>. Because MRT and
