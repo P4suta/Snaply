@@ -9,7 +9,11 @@
 # .NET SDK — mise の core:dotnet バックエンド（プレビルトDL、VC++ build を伴わない＝
 # グローバルの "Windows で VC++ build を走らせない" 方針に合致）。
 # WinUI 3 / Windows App SDK は net10.0-windows を対象とするため 10 系に固定。
-dotnet = "10"
+# パッチまで厳密にピン: Native AOT の暗黙 PackageReference（Microsoft.DotNet.ILCompiler）
+# の版は SDK パッチに追従するため、SDK を固定しないと packages.lock.json が
+# ローカルと CI で食い違い、locked-mode restore が NU1004 で失敗する。
+# 新版が出たら mise-outdated が検知するので、そこで意図的に上げる。
+dotnet = "10.0.300"
 # Task runner (justfile): build / run / test / publish の標準レシピを供給。
 # CI からも同じ `just publish` を叩けるようここで宣言（バンドルロジックの二重化回避）。
 just = "1"
