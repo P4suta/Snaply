@@ -43,6 +43,8 @@ jobs:
               - 'Directory.Build.props'
               - '.editorconfig'
               - 'Snaply.slnx'
+              - 'mise.toml'
+              - '**/packages.lock.json'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
 
