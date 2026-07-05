@@ -33,7 +33,7 @@ jobs:
       code: ${{ steps.f.outputs.code }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: f
         with:
           filters: |
@@ -55,7 +55,7 @@ jobs:
       # Lint the workflow YAML itself: syntax, ${{ }} expression types, and
       # shellcheck over run: blocks. Catches workflow errors before a release run.
       - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
-      - uses: crate-ci/typos@37bb98842b0d8c4ffebdb75301a13db0267cef89 # v1.47.2 (reads root _typos.toml)
+      - uses: crate-ci/typos@bee27e3a4fd1ea2111cf90ab89cd076c870fce14 # v1.47.2 (reads root _typos.toml)
 
   # Core is plain net10.0 with zero platform dependencies, so its tests run on
   # cheap ubuntu — proving the architecture's platform-independence in CI.
