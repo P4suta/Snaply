@@ -20,6 +20,7 @@ on:
       - ".github/workflows/nuget-audit.yml"
   schedule:
     - cron: "33 4 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
