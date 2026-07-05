@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="Snaply.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ctrl="using:Snaply.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:Snaply"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    HighContrastAdjustment="None"
+    mc:Ignorable="d">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--  ===== Row 0: canvas — preview with a persistent floating command bar ===== -->
+        <Border
+            Grid.Row="0"
+            Margin="{StaticResource ContentPadding}"
+            Style="{StaticResource PreviewSurfaceStyle}">
+            <Grid>
+                <ctrl:ZoomableImage x:Name="PreviewImageControl" />
+
+                <!--  Empty state: a quiet hint, not a big dead label (the command bar hosts the action).  -->
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="{StaticResource EmptyStateSpacing}"
+                    Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.HasNoImage), Mode=OneWay}">
+                    <FontIcon
+                        HorizontalAlignment="Center"
+                        FontSize="{StaticResource IconSizeXLarge}"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Glyph="&#xE722;" />
+                    <TextBlock
+                        x:Uid="CaptureHint"
+                        HorizontalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}" />
+                </StackPanel>
+
+                <!--  Persistent command bar: Capture (always) + Save/Copy (with an image) on the
+                      left; Settings on the right. Floats over the top of the preview.  -->
+                <Border
+                    x:Name="CommandBar"
+                    Margin="{StaticResource FloatingToolbarMargin}"
+                    VerticalAlignment="Top"
+                    Style="{StaticResource FloatingToolbarStyle}">
+                    <Grid ColumnSpacing="{StaticResource SpacingSmall}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel
+                            Grid.Column="0"
+                            Orientation="Horizontal"
+                            Spacing="{StaticResource SpacingSmall}">
+                            <SplitButton
+                                x:Name="PrimaryCaptureButton"
+                                AutomationProperties.AutomationId="PrimaryCaptureButton"
+                                Command="{x:Bind ViewModel.PrimaryCaptureCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
+                                    <FontIcon FontSize="{StaticResource IconSizeSmall}" Glyph="{x:Bind ViewModel.PrimaryCaptureGlyph, Mode=OneWay}" />
+                                    <TextBlock Text="{x:Bind ViewModel.PrimaryCaptureLabel, Mode=OneWay}" />
+                                </StackPanel>
+                                <SplitButton.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuFlyoutItem
+                                            x:Uid="CaptureFullScreenLabel"
+                                            AutomationProperties.AutomationId="CaptureFullScreenItem"
+                                            Command="{x:Bind ViewModel.SelectCaptureFullScreenCommand}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="&#xE7B7;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem
+                                            x:Uid="CaptureRegionLabel"
+                                            AutomationProperties.AutomationId="CaptureRegionItem"
+                                            Command="{x:Bind ViewModel.SelectCaptureRegionCommand}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="&#xEF20;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem
+                                            x:Uid="CaptureWindowLabel"
+                                            AutomationProperties.AutomationId="CaptureWindowItem"
+                                            Command="{x:Bind ViewModel.SelectCaptureWindowCommand}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="&#xE737;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </SplitButton.Flyout>
+                            </SplitButton>
+
+                            <SplitButton
+                                x:Name="PrimaryExportButton"
+                                AutomationProperties.AutomationId="PrimaryExportButton"
+                                Command="{x:Bind ViewModel.PrimaryExportCommand}"
+                                Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.HasImage), Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
+                                    <FontIcon FontSize="{StaticResource IconSizeSmall}" Glyph="{x:Bind ViewModel.PrimaryExportGlyph, Mode=OneWay}" />
+                                    <TextBlock Text="{x:Bind ViewModel.PrimaryExportLabel, Mode=OneWay}" />
+                                </StackPanel>
+                                <SplitButton.Flyout>
+                                    <MenuFlyout Placement="Bottom">
+                                        <MenuFlyoutItem
+                                            x:Uid="SavePngLabel"
+                                            AutomationProperties.AutomationId="SaveItem"
+                                            Command="{x:Bind ViewModel.SelectExportSaveCommand}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="&#xE74E;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem
+                                            x:Uid="CopyLabel"
+                                            AutomationProperties.AutomationId="CopyItem"
+                                            Command="{x:Bind ViewModel.SelectExportCopyCommand}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon Glyph="&#xE8C8;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </SplitButton.Flyout>
+                            </SplitButton>
+                        </StackPanel>
+
+                        <Button
+                            x:Name="SettingsButton"
+                            x:Uid="CmdSettings"
+                            Grid.Column="2"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Click="OnSettingsClick">
+                            <FontIcon FontSize="{StaticResource IconSizeSmall}" Glyph="&#xE713;" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <ProgressRing
+                    Width="{StaticResource ProgressRingSize}"
+                    Height="{StaticResource ProgressRingSize}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+
+                <!--  Prominent, dismissible error surface. Friendly title up top; raw technical
+                      detail (code + exception) tucked into the details expander with a copy button.  -->
+                <InfoBar
+                    x:Name="ErrorInfoBar"
+                    Margin="{StaticResource ContentPadding}"
+                    VerticalAlignment="Bottom"
+                    AutomationProperties.AutomationId="ErrorInfoBar"
+                    IsOpen="{x:Bind ViewModel.IsErrorOpen, Mode=TwoWay}"
+                    Severity="Error"
+                    Title="{x:Bind ViewModel.ErrorTitle, Mode=OneWay}">
+                    <InfoBar.Content>
+                        <Expander
+                            x:Uid="ErrorDetailsExpander"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch">
+                            <StackPanel Spacing="{StaticResource SpacingSmall}">
+                                <TextBlock
+                                    AutomationProperties.AutomationId="ErrorDetailText"
+                                    IsTextSelectionEnabled="True"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.ErrorDetail, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <Button
+                                    x:Name="CopyErrorDetailButton"
+                                    x:Uid="ErrorCopyButton"
+                                    AutomationProperties.AutomationId="CopyErrorDetailButton"
+                                    Click="OnCopyErrorDetailClick" />
+                            </StackPanel>
+                        </Expander>
+                    </InfoBar.Content>
+                </InfoBar>
+            </Grid>
+        </Border>
+
+        <!--  ===== Row 1: slim status bar ===== -->
+        <Grid
+            Grid.Row="1"
+            Padding="{StaticResource StatusBarPadding}"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+            BorderThickness="{StaticResource StatusBarBorderThickness}"
+            ColumnSpacing="{StaticResource SpacingMedium}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock
+                x:Name="StatusText"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                AutomationProperties.AutomationId="StatusText"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis" />
+
+            <StackPanel
+                Grid.Column="1"
+                Orientation="Horizontal"
+                Spacing="{StaticResource SpacingSmall}"
+                Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.HasImage), Mode=OneWay}">
+                <FontIcon
+                    FontSize="{StaticResource IconSizeXSmall}"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    Glyph="&#xE9A9;" />
+                <TextBlock
+                    x:Name="DimensionsText"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="DimensionsText"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

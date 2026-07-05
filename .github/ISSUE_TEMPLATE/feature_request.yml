@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an idea
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Before you file
+
+        Snaply is a focused **screenshot** tool for Windows. Some things are
+        planned extensions (annotation editor, OCR, scrolling capture); others
+        are **out of scope** and such requests will be closed:
+
+        - Video / screen recording
+        - Cross-platform support (Windows-only by design)
+        - Cloud upload / account features
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: I confirm this is not on the out-of-scope list above.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

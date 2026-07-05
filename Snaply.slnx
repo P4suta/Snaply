@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Snaply.App/Snaply.App.csproj" />
+    <Project Path="src/Snaply.Core/Snaply.Core.csproj" />
+    <Project Path="src/Snaply.Launcher/Snaply.Launcher.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/Snaply.Platform/Snaply.Platform.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Snaply.Tests/Snaply.Tests.csproj" />
+  </Folder>
+</Solution>

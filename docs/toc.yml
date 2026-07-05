@@ -1,0 +1,12 @@
+- name: Home
+  href: index.md
+- name: Architecture
+  href: ARCHITECTURE.md
+- name: Releasing
+  href: RELEASING.md
+- name: Signing
+  href: SIGNING.md
+- name: Supply chain
+  href: SUPPLY_CHAIN.md
+- name: API
+  href: api/

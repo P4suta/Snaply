@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Snaply.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Snaply.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

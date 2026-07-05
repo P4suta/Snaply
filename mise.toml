@@ -1,0 +1,22 @@
+# Snaply — プロジェクトローカルのツールチェーン定義
+# 環境全体が mise + chezmoi 管理のため、本プロジェクトも mise でツールを供給する。
+# mise はこのディレクトリ配下で自動有効化される（`mise install` で導入）。
+#
+# 注意: グローバル設定 (~/.config/mise/config.toml, chezmoi 管理) は変更しない。
+# ここで pin するのはプロジェクト固有のランタイムのみ。
+
+[tools]
+# .NET SDK — mise の core:dotnet バックエンド（プレビルトDL、VC++ build を伴わない＝
+# グローバルの "Windows で VC++ build を走らせない" 方針に合致）。
+# WinUI 3 / Windows App SDK は net10.0-windows を対象とするため 10 系に固定。
+dotnet = "10"
+# Task runner (justfile): build / run / test / publish の標準レシピを供給。
+# CI からも同じ `just publish` を叩けるようここで宣言（バンドルロジックの二重化回避）。
+just = "1"
+
+[settings]
+experimental = true
+
+# WinUI テンプレートは dotnet 導入後に一度だけ:
+#   mise exec -- dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates
+# winapp CLI は環境に導入済み（mise 管理外）。

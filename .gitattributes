@@ -1,0 +1,28 @@
+# Normalize line endings so `dotnet format` (which enforces .editorconfig's
+# `end_of_line = crlf`) is consistent on every runner, while keeping the files
+# that must stay LF (CI shell / YAML — CRLF breaks bash `run:` blocks on Linux
+# runners) as LF.
+
+* text=auto
+
+# C# / MSBuild / XAML: CRLF, matching .editorconfig (what `dotnet format` checks).
+*.cs       text eol=crlf
+*.csproj   text eol=crlf
+*.props    text eol=crlf
+*.targets  text eol=crlf
+*.xaml     text eol=crlf
+*.resw     text eol=crlf
+*.manifest text eol=crlf
+*.slnx     text eol=crlf
+
+# CI must stay LF.
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sh   text eol=lf
+
+# Binary assets — never touch.
+*.png  binary
+*.ico  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary

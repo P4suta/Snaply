@@ -1,0 +1,70 @@
+version: 2
+updates:
+  # C# projects — one nuget entry per project directory (each has its own
+  # packages.lock.json).
+  - package-ecosystem: nuget
+    directory: /src/Snaply.Core
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      dotnet-core:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: nuget
+    directory: /src/Snaply.Platform
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      dotnet-platform:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: nuget
+    directory: /src/Snaply.App
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      dotnet-app:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: nuget
+    directory: /src/Snaply.Launcher
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      dotnet-launcher:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: nuget
+    directory: /tests/Snaply.Tests
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      dotnet-tests:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+
+  # The workflow actions themselves (keeps the SHA pins current).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci

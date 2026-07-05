@@ -1,0 +1,58 @@
+# NuGet advisory scan over the restored dependency graph (the .NET counterpart to
+# find-my-files' cargo-audit). The scheduled run catches newly-disclosed
+# advisories even when nothing changed. Runs on windows because the App/Platform
+# projects target net10.0-windows and only restore there.
+name: nuget-audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.csproj"
+      - "**/packages.lock.json"
+      - "Directory.Build.props"
+      - ".github/workflows/nuget-audit.yml"
+  pull_request:
+    paths:
+      - "**/*.csproj"
+      - "**/packages.lock.json"
+      - "Directory.Build.props"
+      - ".github/workflows/nuget-audit.yml"
+  schedule:
+    - cron: "33 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-dotnet-mise
+      - name: Restore (locked)
+        run: mise exec -- dotnet restore Snaply.slnx --locked-mode
+
+      # `dotnet list package --vulnerable` exits 0 even when it finds advisories,
+      # so gate on the presence of the "vulnerable packages" marker in the output.
+      - name: Scan for vulnerable packages (gate)
+        shell: bash
+        run: |
+          out=$(mise exec -- dotnet list Snaply.slnx package --vulnerable --include-transitive 2>&1)
+          echo "$out"
+          if echo "$out" | grep -qi "has the following vulnerable packages"; then
+            echo "::error::vulnerable NuGet package(s) found — see the listing above"
+            exit 1
+          fi
+          echo "No vulnerable packages."
+
+      # Deprecated packages are a warning, not a gate — surface them without failing.
+      - name: Report deprecated packages (advisory)
+        shell: bash
+        run: |
+          out=$(mise exec -- dotnet list Snaply.slnx package --deprecated --include-transitive 2>&1)
+          echo "$out"
+          if echo "$out" | grep -qi "has the following deprecated packages"; then
+            echo "::warning::deprecated NuGet package(s) in use — consider replacing them"
+          fi

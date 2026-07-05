@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- ===== 命令栏 (MainPage.xaml) ===== -->
+  <data name="CaptureFullScreenLabel.Text" xml:space="preserve">
+    <value>捕获全屏</value>
+  </data>
+  <data name="CaptureRegionLabel.Text" xml:space="preserve">
+    <value>捕获区域</value>
+  </data>
+  <data name="CaptureWindowLabel.Text" xml:space="preserve">
+    <value>捕获窗口</value>
+  </data>
+  <data name="SavePngLabel.Text" xml:space="preserve">
+    <value>保存 PNG</value>
+  </data>
+  <data name="CopyLabel.Text" xml:space="preserve">
+    <value>复制</value>
+  </data>
+  <data name="CmdSettings.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="CmdSettings.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <!-- ===== 统一捕获按钮 (SplitButton primary 标签 + 主区域提示) ===== -->
+  <data name="CaptureModeRegion" xml:space="preserve">
+    <value>捕获区域</value>
+  </data>
+  <data name="CaptureModeFullScreen" xml:space="preserve">
+    <value>捕获全屏</value>
+  </data>
+  <data name="CaptureModeWindow" xml:space="preserve">
+    <value>捕获窗口</value>
+  </data>
+  <data name="CaptureHint.Text" xml:space="preserve">
+    <value>选择全屏、区域或窗口进行捕获</value>
+  </data>
+  <!-- ===== 主题选择 (设置 &gt; 常规) ===== -->
+  <data name="CardTheme.Header" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="ThemeSystem.Content" xml:space="preserve">
+    <value>系统</value>
+  </data>
+  <data name="ThemeLight.Content" xml:space="preserve">
+    <value>浅色</value>
+  </data>
+  <data name="ThemeDark.Content" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <!-- ===== 捕获浮层 (RegionOverlayWindow.xaml / WindowPickerOverlay.xaml) ===== -->
+  <data name="RegionHint.Text" xml:space="preserve">
+    <value>拖动以选择区域  ·  按 Esc 取消</value>
+  </data>
+  <data name="WindowPickerHint.Text" xml:space="preserve">
+    <value>点击窗口进行捕获  ·  按 Esc 取消</value>
+  </data>
+  <!-- ===== 设置对话框 (SettingsDialog.xaml) ===== -->
+  <data name="CardBackground.Header" xml:space="preserve">
+    <value>背景</value>
+  </data>
+  <data name="CardBackground.Description" xml:space="preserve">
+    <value>填充捕获内容的背后</value>
+  </data>
+  <data name="CardShadow.Header" xml:space="preserve">
+    <value>投影</value>
+  </data>
+  <data name="CardShadow.Description" xml:space="preserve">
+    <value>在捕获内容下方投下柔和的阴影</value>
+  </data>
+  <data name="CardAspect.Header" xml:space="preserve">
+    <value>宽高比</value>
+  </data>
+  <data name="SegAspect.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>宽高比</value>
+  </data>
+  <data name="AspectAuto.Content" xml:space="preserve">
+    <value>自动</value>
+  </data>
+  <data name="AspectSquare.Content" xml:space="preserve">
+    <value>正方形</value>
+  </data>
+  <data name="AspectFourThree.Content" xml:space="preserve">
+    <value>4:3</value>
+  </data>
+  <data name="AspectSixteenNine.Content" xml:space="preserve">
+    <value>16:9</value>
+  </data>
+  <data name="SectionCapture.Text" xml:space="preserve">
+    <value>捕获</value>
+  </data>
+  <data name="CardHide.Header" xml:space="preserve">
+    <value>捕获时隐藏</value>
+  </data>
+  <data name="CardHide.Description" xml:space="preserve">
+    <value>捕获期间隐藏 Snaply 窗口，避免出现在截图中</value>
+  </data>
+  <data name="SectionGeneral.Text" xml:space="preserve">
+    <value>常规</value>
+  </data>
+  <data name="CardLanguage.Header" xml:space="preserve">
+    <value>语言</value>
+  </data>
+  <data name="CardLanguage.Description" xml:space="preserve">
+    <value>选择显示语言</value>
+  </data>
+  <!-- ===== 缩放控件 (ZoomableImage.xaml) ===== -->
+  <data name="PreviewImageA11y.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>美化后的截图预览</value>
+  </data>
+  <data name="ZoomFit.Content" xml:space="preserve">
+    <value>适应</value>
+  </data>
+  <data name="ZoomFit.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>使图像适应视图</value>
+  </data>
+  <data name="ZoomHundred.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>以实际像素缩放</value>
+  </data>
+  <!-- ===== 状态消息 (MainViewModel via IUiStrings) ===== -->
+  <data name="StatusReady" xml:space="preserve">
+    <value>准备就绪。捕获全屏或某个区域即可开始。</value>
+  </data>
+  <data name="StatusCapturingFullScreen" xml:space="preserve">
+    <value>正在捕获全屏…</value>
+  </data>
+  <data name="StatusRegionUnavailable" xml:space="preserve">
+    <value>区域捕获不可用。</value>
+  </data>
+  <data name="StatusSelectRegion" xml:space="preserve">
+    <value>选择一个区域…</value>
+  </data>
+  <data name="StatusRegionCancelled" xml:space="preserve">
+    <value>已取消区域捕获。</value>
+  </data>
+  <data name="StatusCapturingRegion" xml:space="preserve">
+    <value>正在捕获区域…</value>
+  </data>
+  <data name="StatusWindowUnavailable" xml:space="preserve">
+    <value>窗口捕获不可用。</value>
+  </data>
+  <data name="StatusSelectWindow" xml:space="preserve">
+    <value>选择一个窗口…</value>
+  </data>
+  <data name="StatusWindowCancelled" xml:space="preserve">
+    <value>已取消窗口捕获。</value>
+  </data>
+  <data name="StatusCapturingWindow" xml:space="preserve">
+    <value>正在捕获窗口…</value>
+  </data>
+  <data name="StatusSaveCancelled" xml:space="preserve">
+    <value>已取消保存。</value>
+  </data>
+  <data name="StatusSavedFormat" xml:space="preserve">
+    <value>已保存到 {0}</value>
+  </data>
+  <data name="StatusSaveFailedFormat" xml:space="preserve">
+    <value>保存失败：{0}</value>
+  </data>
+  <data name="StatusCopied" xml:space="preserve">
+    <value>已复制到剪贴板。</value>
+  </data>
+  <data name="StatusCopyFailedFormat" xml:space="preserve">
+    <value>复制失败：{0}</value>
+  </data>
+  <data name="StatusDimensionsFormat" xml:space="preserve">
+    <value>{0} × {1} px</value>
+  </data>
+  <data name="StatusErrorFormat" xml:space="preserve">
+    <value>错误：{0}</value>
+  </data>
+  <!-- ===== 背景预设名称 (MainViewModel) ===== -->
+  <data name="BackgroundAuto" xml:space="preserve">
+    <value>自动</value>
+  </data>
+  <data name="BackgroundNone" xml:space="preserve">
+    <value>无（透明）</value>
+  </data>
+  <data name="BackgroundIndigoViolet" xml:space="preserve">
+    <value>靛蓝 → 紫罗兰</value>
+  </data>
+  <data name="BackgroundOcean" xml:space="preserve">
+    <value>海洋</value>
+  </data>
+  <data name="BackgroundSunset" xml:space="preserve">
+    <value>日落</value>
+  </data>
+  <data name="BackgroundWhite" xml:space="preserve">
+    <value>纯白</value>
+  </data>
+  <data name="BackgroundCharcoal" xml:space="preserve">
+    <value>炭黑</value>
+  </data>
+  <!-- ===== 托盘菜单 (App.xaml.cs -> TrayService) ===== -->
+  <data name="TrayCaptureRegion" xml:space="preserve">
+    <value>捕获区域</value>
+  </data>
+  <data name="TrayCaptureFullScreen" xml:space="preserve">
+    <value>捕获全屏</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>退出</value>
+  </data>
+  <!-- ===== 保存对话框 (MainPage.xaml.cs) ===== -->
+  <data name="SaveFileTypePng" xml:space="preserve">
+    <value>PNG 图像</value>
+  </data>
+  <!-- ===== 设置对话框框架 + 语言切换 (代码隐藏) ===== -->
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="SettingsCloseButton" xml:space="preserve">
+    <value>完成</value>
+  </data>
+  <data name="LanguageSystemDefault" xml:space="preserve">
+    <value>跟随系统</value>
+  </data>
+  <data name="RestartDialogTitle" xml:space="preserve">
+    <value>需要重启</value>
+  </data>
+  <data name="RestartDialogBody" xml:space="preserve">
+    <value>Snaply 将重启以应用新的显示语言。</value>
+  </data>
+  <data name="RestartNowButton" xml:space="preserve">
+    <value>立即重启</value>
+  </data>
+  <data name="RestartLaterButton" xml:space="preserve">
+    <value>稍后</value>
+  </data>
+  <!-- ===== 错误可视化 (ErrorPresenter / InfoBar) ===== -->
+  <data name="Error_capture_monitor" xml:space="preserve">
+    <value>无法捕获屏幕。</value>
+  </data>
+  <data name="Error_capture_window" xml:space="preserve">
+    <value>无法捕获该窗口。</value>
+  </data>
+  <data name="Error_capture_region" xml:space="preserve">
+    <value>无法捕获所选区域。</value>
+  </data>
+  <data name="Error_beautify_render" xml:space="preserve">
+    <value>无法渲染截图。</value>
+  </data>
+  <data name="Error_export_save" xml:space="preserve">
+    <value>无法保存截图。</value>
+  </data>
+  <data name="Error_export_clipboard" xml:space="preserve">
+    <value>无法将截图复制到剪贴板。</value>
+  </data>
+  <data name="Error_hotkey_register" xml:space="preserve">
+    <value>无法注册快捷键。</value>
+  </data>
+  <data name="Error_hotkey_parse" xml:space="preserve">
+    <value>快捷键无效。</value>
+  </data>
+  <data name="Error_hotkey_disposed" xml:space="preserve">
+    <value>快捷键服务不可用。</value>
+  </data>
+  <data name="Error_pipeline_nocapture" xml:space="preserve">
+    <value>还没有可处理的内容，请先捕获。</value>
+  </data>
+  <data name="Error_unknown" xml:space="preserve">
+    <value>出现了问题。</value>
+  </data>
+  <data name="ErrorDetailsExpander.Header" xml:space="preserve">
+    <value>详情</value>
+  </data>
+  <data name="ErrorCopyButton.Content" xml:space="preserve">
+    <value>复制</value>
+  </data>
+  <data name="StatusHotkeyUnavailable" xml:space="preserve">
+    <value>快捷键 {0} 已被占用，无法注册。</value>
+  </data>
+  <!-- ===== 崩溃对话框 (CrashHandler / App) ===== -->
+  <data name="CrashTitle" xml:space="preserve">
+    <value>出现了问题</value>
+  </data>
+  <data name="CrashBody" xml:space="preserve">
+    <value>Snaply 遇到意外错误。崩溃报告已保存到日志文件夹。你可以继续使用、重启或查看日志。</value>
+  </data>
+  <data name="CrashOpenLogs" xml:space="preserve">
+    <value>打开日志</value>
+  </data>
+  <data name="CrashRestart" xml:space="preserve">
+    <value>重启</value>
+  </data>
+  <data name="CrashClose" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <!-- ===== 诊断面板 (SettingsDialog) ===== -->
+  <data name="CardLogs.Header" xml:space="preserve">
+    <value>日志与崩溃报告</value>
+  </data>
+  <data name="CardLogs.Description" xml:space="preserve">
+    <value>打开保存日志和崩溃报告的文件夹</value>
+  </data>
+  <data name="OpenLogsButton.Content" xml:space="preserve">
+    <value>打开日志文件夹</value>
+  </data>
+  <data name="CopyDiagnosticsButton.Content" xml:space="preserve">
+    <value>复制诊断信息</value>
+  </data>
+  <data name="CardVerboseLogging.Header" xml:space="preserve">
+    <value>详细日志</value>
+  </data>
+  <data name="CardVerboseLogging.Description" xml:space="preserve">
+    <value>记录更多细节以帮助排查问题</value>
+  </data>
+  <!-- ===== 重构后的设置: 美化组 + 导出按钮 + 诊断展开器 ===== -->
+  <data name="SectionBeautify.Text" xml:space="preserve">
+    <value>美化</value>
+  </data>
+  <data name="ExportSave" xml:space="preserve">
+    <value>保存 PNG</value>
+  </data>
+  <data name="ExportCopy" xml:space="preserve">
+    <value>复制</value>
+  </data>
+  <data name="ExpanderDiagnostics.Header" xml:space="preserve">
+    <value>诊断</value>
+  </data>
+  <data name="ExpanderDiagnostics.Description" xml:space="preserve">
+    <value>日志、崩溃报告和应用信息</value>
+  </data>
+</root>

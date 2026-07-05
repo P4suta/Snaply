@@ -1,0 +1,15 @@
+{
+  "name": "require-signed-commits",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["~ALL"],
+      "exclude": ["refs/heads/gh-pages"]
+    }
+  },
+  "rules": [
+    { "type": "required_signatures" }
+  ]
+}

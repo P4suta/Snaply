@@ -1,0 +1,66 @@
+# Static analysis for the C# app and the GitHub Actions workflows themselves.
+#
+# Two independent analyses:
+#   - csharp (analyze): build-mode manual because the WinUI app is self-contained
+#     and targets net10.0-windows — autobuild can't infer the x64 platform. We
+#     trace an explicit Release build.
+#   - actions (analyze-actions): build-mode none, cheap ubuntu. Continuously
+#     re-checks workflow GITHUB_TOKEN permissions so the missing-permissions
+#     class can't silently regress.
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"
+
+# Least privilege: read-only at the top level; each job requests the
+# security-events write it needs to upload SARIF.
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write # upload CodeQL SARIF results
+      contents: read # checkout
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-dotnet-mise
+      - name: Restore (locked)
+        run: mise exec -- dotnet restore Snaply.slnx --locked-mode
+
+      - uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          languages: csharp
+          build-mode: manual
+
+      - name: build for CodeQL
+        run: mise exec -- dotnet build src/Snaply.App/Snaply.App.csproj -c Release -p:Platform=x64 --no-restore
+
+      - uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          category: "/language:csharp"
+
+  # Scans the workflow YAML itself (GITHUB_TOKEN permissions, untrusted-input,
+  # etc.). build-mode none needs no toolchain, so it runs on cheap ubuntu.
+  analyze-actions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      security-events: write # upload CodeQL SARIF results
+      contents: read # checkout
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          languages: actions
+          build-mode: none
+      - uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          category: "/language:actions"

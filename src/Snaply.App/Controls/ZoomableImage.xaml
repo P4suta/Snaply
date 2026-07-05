@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="Snaply.Controls.ZoomableImage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:Snaply.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <!--  Transparent background so pointer events (wheel / drag) fire over empty areas too.  -->
+    <Grid
+        x:Name="Viewport"
+        Background="Transparent"
+        DoubleTapped="OnDoubleTapped"
+        PointerCanceled="OnPointerReleased"
+        PointerMoved="OnPointerMoved"
+        PointerPressed="OnPointerPressed"
+        PointerReleased="OnPointerReleased"
+        PointerWheelChanged="OnPointerWheelChanged"
+        SizeChanged="OnViewportSizeChanged">
+
+        <!--  Zoom/pan are driven by Composition (element Scale/Offset) for GPU-smooth motion.  -->
+        <Image
+            x:Name="DisplayImage"
+            x:Uid="PreviewImageA11y"
+            AutomationProperties.AutomationId="PreviewImage"
+            Stretch="Uniform" />
+
+        <!--  Floating zoom controls, bottom-right  -->
+        <Border
+            x:Name="ZoomControlsBar"
+            Margin="{StaticResource ZoomControlsMargin}"
+            Padding="{StaticResource ZoomControlsPadding}"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="{StaticResource SurfaceBorderThickness}"
+            CornerRadius="{StaticResource ControlCornerRadius}"
+            Visibility="Collapsed">
+            <StackPanel
+                Orientation="Horizontal"
+                Spacing="{StaticResource SpacingSmall}"
+                VerticalAlignment="Center">
+                <TextBlock
+                    x:Name="ZoomLabel"
+                    MinWidth="{StaticResource ZoomLabelMinWidth}"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="ZoomLabel"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="100%"
+                    TextAlignment="Center" />
+                <Button
+                    x:Name="FitButton"
+                    x:Uid="ZoomFit"
+                    AutomationProperties.AutomationId="ZoomFitButton"
+                    Click="OnFitClick" />
+                <Button
+                    x:Name="HundredButton"
+                    x:Uid="ZoomHundred"
+                    AutomationProperties.AutomationId="ZoomHundredButton"
+                    Click="OnHundredClick"
+                    Content="100%" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

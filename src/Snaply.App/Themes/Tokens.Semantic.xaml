@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Semantic design tokens — purpose-named dimensions, corner radii, and the
+    Thickness shapes (Margin / Padding / BorderThickness). A Thickness cannot be
+    composed from x:Double tokens in markup, so every distinct shape is declared
+    here once and referenced by name.
+
+    Depends on Tokens.Primitives.xaml (merged earlier). Fluent's own
+    ControlCornerRadius (4) / OverlayCornerRadius (8) come from
+    XamlControlsResources and are referenced directly, never redefined here.
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--  ===== Layout dimensions (x:Double) =====  -->
+    <!--  Editor side panel: fixed comfortable width for the beautify controls.  -->
+    <x:Double x:Key="SidePanelWidth">360</x:Double>
+    <!--  Preview surface never collapses below a usable canvas.  -->
+    <x:Double x:Key="PreviewMinWidth">360</x:Double>
+    <x:Double x:Key="PreviewMinHeight">280</x:Double>
+    <!--  Settings dialog content caps its height and scrolls when the sections
+          overflow (the dialog itself does not scroll by default).  -->
+    <x:Double x:Key="SettingsScrollMaxHeight">520</x:Double>
+    <!--  In-card slider: wide enough to be draggable, narrow enough to leave room
+          for the live value label on the card's right edge.  -->
+    <x:Double x:Key="InlineSliderWidth">160</x:Double>
+    <x:Double x:Key="SliderValueMinWidth">44</x:Double>
+
+    <!--  Inline affordances  -->
+    <x:Double x:Key="ProgressRingSize">48</x:Double>
+    <x:Double x:Key="EmptyStateSpacing">12</x:Double>
+    <x:Double x:Key="CommandDividerHeight">24</x:Double>
+    <x:Double x:Key="DividerThickness">1</x:Double>
+
+    <!--  ===== Editor window initial + minimum client size (read in code-behind) =====  -->
+    <x:Double x:Key="WindowWidth">1200</x:Double>
+    <x:Double x:Key="WindowHeight">800</x:Double>
+    <x:Double x:Key="WindowMinWidth">880</x:Double>
+    <x:Double x:Key="WindowMinHeight">600</x:Double>
+
+    <!--  ===== Thickness shapes — Padding =====  -->
+    <Thickness x:Key="CommandBarPadding">16,10</Thickness>
+    <Thickness x:Key="ContentPadding">16</Thickness>
+    <Thickness x:Key="PreviewSurfacePadding">24</Thickness>
+    <Thickness x:Key="StatusBarPadding">16,8</Thickness>
+    <Thickness x:Key="HintBubblePadding">16,10</Thickness>
+
+    <!--  ===== Thickness shapes — Margin =====  -->
+    <Thickness x:Key="SidePanelContentMargin">16,0,0,0</Thickness>
+    <Thickness x:Key="HintBubbleMargin">0,48,0,0</Thickness>
+
+    <!--  ===== BorderThickness =====  -->
+    <Thickness x:Key="SurfaceBorderThickness">1</Thickness>
+    <!--  Status bar reads as a footer: a single hairline along its top edge.  -->
+    <Thickness x:Key="StatusBarBorderThickness">0,1,0,0</Thickness>
+    <!--  Command bar reads as a header: a single hairline along its bottom edge.  -->
+    <Thickness x:Key="CommandBarBorderThickness">0,0,0,1</Thickness>
+    <!--  Region-overlay selection stroke.  -->
+    <x:Double x:Key="SelectionStrokeThickness">2</x:Double>
+
+    <!--  ===== Content-hosted action toolbar (floats over the preview top) =====  -->
+    <!--  Inset from the preview surface edges so the bar floats clear of the image.  -->
+    <Thickness x:Key="FloatingToolbarMargin">12</Thickness>
+    <!--  Compact chrome around the capture / save / copy controls.  -->
+    <Thickness x:Key="FloatingToolbarPadding">8,6</Thickness>
+
+    <!--  ===== Zoomable preview: floating zoom-control bar (bottom-right) =====  -->
+    <!--  Inset from the preview surface edges so the bar floats clear of the image.  -->
+    <Thickness x:Key="ZoomControlsMargin">12</Thickness>
+    <!--  Compact chrome around the zoom label + Fit / 100% buttons.  -->
+    <Thickness x:Key="ZoomControlsPadding">8,4</Thickness>
+    <!--  Live zoom-percent label: fixed width so the bar does not jitter as it changes.  -->
+    <x:Double x:Key="ZoomLabelMinWidth">48</x:Double>
+</ResourceDictionary>

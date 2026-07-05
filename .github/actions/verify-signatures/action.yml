@@ -1,0 +1,51 @@
+name: Verify Authenticode signatures
+description: >-
+  Hard-verify that the project's own PE files in a built bundle are
+  Authenticode-signed with a valid chain, an RFC 3161 timestamp, and the
+  expected signer subject. Shared by release.yml's sign job (its post-signing
+  self-check) and its publish job (a gate at the irreversible boundary, so a
+  silently-unsigned bundle can never be published immutably). The single source
+  for the verify so the two callers never drift. signtool ships in the Windows
+  SDK on windows-latest; no secrets or toolchain.
+
+inputs:
+  bundle-dir:
+    description: "Bundle root holding Snaply.exe and app\\ (no trailing slash)."
+    required: true
+  signer-subject-contains:
+    description: "Substring the signer certificate subject must contain (identity assertion)."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # signtool verify /pa /tw: exit 0 = chain valid + timestamped, 2 = NOT
+    # timestamped, 1 = invalid -> any non-zero fails. Then assert the signer
+    # subject so a different (even validly-chained) certificate cannot pass
+    # silently. Inputs flow through env (not ${{ }} interpolation) so the script
+    # body carries no injectable expansion.
+    - name: Verify signatures
+      shell: pwsh
+      env:
+        BUNDLE_DIR: ${{ inputs.bundle-dir }}
+        SIGNER_SUBJECT_CONTAINS: ${{ inputs.signer-subject-contains }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+          Sort-Object FullName | Select-Object -Last 1
+        if (-not $signtool) {
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x86\signtool.exe" |
+            Sort-Object FullName | Select-Object -Last 1
+        }
+        if (-not $signtool) { throw "signtool.exe not found under the Windows SDK" }
+        $targets = 'Snaply.exe', 'app/Snaply.App.exe'
+        foreach ($f in $targets) {
+          $p = "$env:BUNDLE_DIR/$f"
+          & $signtool.FullName verify /pa /tw $p
+          if ($LASTEXITCODE -ne 0) { throw "verify failed for $f (exit $LASTEXITCODE) - chain invalid or NOT timestamped" }
+          $sig = Get-AuthenticodeSignature $p
+          if ($sig.SignerCertificate.Subject -notlike "*$env:SIGNER_SUBJECT_CONTAINS*") {
+            throw "unexpected signer for $f - $($sig.SignerCertificate.Subject)"
+          }
+          Write-Host "verified: $f - $($sig.SignerCertificate.Subject) (chain+timestamp+signer OK)"
+        }

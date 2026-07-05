@@ -1,0 +1,42 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../src/Snaply.Core",
+          "files": ["**/*.csproj"]
+        }
+      ],
+      "dest": "api",
+      "comment": "API reference is generated for Snaply.Core only — it targets plain net10.0 with zero platform dependencies, so `docfx metadata` restores and builds it on any runner (including the ubuntu Pages job). The Platform/App layers are documented conceptually."
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": ["api/**.yml", "api/index.md"]
+      },
+      {
+        "files": ["**.md", "toc.yml"],
+        "exclude": ["_site/**", "obj/**", "api/**"]
+      }
+    ],
+    "resource": [
+      {
+        "files": ["screenshots/**"]
+      }
+    ],
+    "output": "_site",
+    "template": ["default", "modern"],
+    "globalMetadata": {
+      "_appName": "Snaply",
+      "_appTitle": "Snaply",
+      "_appFooter": "Snaply — Apache-2.0",
+      "_enableSearch": true,
+      "_gitContribute": {
+        "repo": "https://github.com/P4suta/Snaply",
+        "branch": "main"
+      }
+    }
+  }
+}

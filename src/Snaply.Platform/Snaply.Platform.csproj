@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Windows TFM: this layer is the ONLY place allowed to touch WinRT / Win2D /
+         Win32. Snaply.Core stays on plain net10.0 so the dependency direction
+         (App -> Platform -> Core, Core -> nothing platform-specific) is enforced
+         by the compiler, not by convention. -->
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Consume WinUI/Win2D types without being an app: no MSIX tooling, and the
+         SDK refs come from the WinUI component package below. -->
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <!-- Restore/resolve the Windows TFM even on non-Windows CI (dependency scans). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Win2D: the GPU canvas used by both the capture surface->bytes conversion
+         and the beautify compositor. Win2D depends on the Windows App SDK
+         *metapackage* (there is no component-package build of Win2D), so we use
+         the metapackage here and in the app rather than the slimmer WinUI
+         component package find-my-files uses — mixing the two double-imports the
+         WinUI targets. The metapackage is ~50MB heavier in the self-contained
+         bundle; revisit if Win2D ever ships against the component packages. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
+    <!-- System-tray icon (WinUI 3 has no native NotifyIcon). -->
+    <PackageReference Include="H.NotifyIcon" Version="2.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Snaply.Core\Snaply.Core.csproj" />
+  </ItemGroup>
+
+</Project>

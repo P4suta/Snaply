@@ -1,0 +1,276 @@
+# Dispatched (by release-please) build / sign / publish, split into three jobs so
+# the signing credentials touch the smallest possible surface:
+#
+#   build   -> assembles the distributable bundle (`just publish`) + SBOM and
+#              uploads them as artifacts. Holds NO secrets, read-only token.
+#   sign    -> downloads the bundle and Authenticode-signs Snaply's own PE files
+#              with SSL.com eSigner (batch_sign, SHA-pinned), then hard-verifies
+#              chain + timestamp + signer. The only job that sees the signing
+#              secrets, so it runs in the approval-gated `release` environment.
+#   publish -> downloads the signed bundle, RE-VERIFIES it is signed (a gate at
+#              the irreversible boundary), zips + checksums it, writes keyless
+#              build-provenance + SBOM attestations (Sigstore via the OIDC
+#              GITHUB_TOKEN — no stored secrets) and attaches everything to the
+#              release-please draft, then publishes it. Runs only when publish=true.
+#
+# Signing is dormant until the eSigner secrets are set: a real run (publish=true)
+# re-verifies the bundle is signed and FAILS before creating the immutable Release
+# if it is not, so a missing secret can never ship an unsigned release unnoticed.
+# A publish=false smoke test runs to completion UNSIGNED with a ::warning::.
+# Setup: docs/SIGNING.md and docs/RELEASING.md.
+#
+# Verify a download with `gh attestation verify <zip> --repo P4suta/Snaply`.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Version tag to release (e.g. v0.1.0), or a branch/ref for a publish=false signing test"
+        required: true
+        type: string
+      sha:
+        description: "Commit SHA to build from (release-please passes the release commit; omit to build from tag_name)"
+        required: false
+        type: string
+      publish:
+        description: "Publish the GitHub Release (false = build+sign+verify only, no release/attestations)"
+        required: false
+        default: true
+        type: boolean
+
+# One release per ref at a time; never cancel a run mid-sign/mid-publish.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Least privilege: read-only at the top level; each job requests only what it needs.
+permissions:
+  contents: read
+
+env:
+  # The version tag (vX.Y.Z) — reused for stamping, zip naming, and the release.
+  TAG: ${{ inputs.tag_name }}
+  # Where to get the code: the release commit SHA when release-please dispatches us
+  # (the tag doesn't exist yet); falls back to tag_name for a manual smoke test.
+  REF: ${{ inputs.sha || inputs.tag_name }}
+  # The signer certificate's subject — asserted at verify time so a different
+  # (even validly-chained) certificate cannot pass silently. Set this to your
+  # SSL.com certificate's subject when you enable signing (see docs/SIGNING.md).
+  SIGNER_SUBJECT_CONTAINS: "CN=P4suta"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1) Build the distributable bundle + SBOM. No secrets here.
+  # ---------------------------------------------------------------------------
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      # Fail fast on a publishing run pointed at a non-version ref before the
+      # gated `sign` job burns a reviewer approval on a misfire.
+      - name: Validate tag for a publishing run
+        if: ${{ inputs.publish }}
+        shell: bash
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::publishing run requires a vX.Y.Z tag, got '$TAG' (use publish=false for a signing smoke test from a branch)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.REF }}
+      - uses: ./.github/actions/setup-dotnet-mise
+
+      # Only stamp a version when the tag is a real vX.Y.Z; a publish=false smoke
+      # test (e.g. tag_name=main) builds an unstamped dev bundle.
+      - name: Resolve version spec
+        id: ver
+        shell: bash
+        run: |
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "spec=$TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "spec=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build distributable bundle
+        run: mise exec -- just publish "${{ steps.ver.outputs.spec }}"
+
+      # CycloneDX SBOM + osv-scanner release gate, shared with sbom-monitor via a
+      # composite action so the tool versions never drift. Runs after the build so
+      # the resolved graph matches what shipped.
+      - name: Generate SBOM and scan (release gate)
+        uses: ./.github/actions/sbom-scan
+
+      - name: Upload unsigned bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: build/dist/Snaply
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: build/sbom
+          retention-days: 1
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # 2) Authenticode-sign Snaply's own PEs with SSL.com eSigner. The only job with
+  #    signing secrets -> approval-gated `release` environment.
+  # ---------------------------------------------------------------------------
+  sign:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+    env:
+      # secrets.* cannot be referenced in `if:`; hoist presence to a job-level
+      # env bool, then gate the signing steps on env.HAVE_SIGNING.
+      HAVE_SIGNING: ${{ secrets.ES_USERNAME != '' && secrets.CREDENTIAL_ID != '' }}
+    steps:
+      # The Verify step uses a local composite action, so the repo tree must be
+      # present. Runs first, before the artifact download, so checkout's clean
+      # does not wipe the downloaded bundle.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.REF }}
+      - uses: ./.github/actions/setup-dotnet-mise
+
+      - name: Download unsigned bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: build/dist/Snaply
+
+      # Collect Snaply's own PE files into a flat staging dir for batch_sign
+      # (the bundled Microsoft-signed runtime DLLs are deliberately not re-signed).
+      - name: Stage first-party binaries for signing
+        if: env.HAVE_SIGNING == 'true'
+        run: mise exec -- just sign-stage
+
+      - name: Sign staged binaries (SSL.com eSigner)
+        if: env.HAVE_SIGNING == 'true'
+        uses: SSLcom/esigner-codesign@cf5f6c1d38ad10f47e3ed9aca873f429b1a8d85b # v1.3.2
+        with:
+          command: batch_sign
+          username: ${{ secrets.ES_USERNAME }}
+          password: ${{ secrets.ES_PASSWORD }}
+          credential_id: ${{ secrets.CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
+          dir_path: ${{ github.workspace }}\build\sign-stage
+          output_path: ${{ github.workspace }}\build\signed
+          environment_name: PROD
+          malware_block: "true"
+
+      - name: Copy signed binaries back into the bundle
+        if: env.HAVE_SIGNING == 'true'
+        run: mise exec -- just sign-collect
+
+      # Never ship a "signed" build that is silently unsigned, untimestamped, or
+      # signed by the wrong cert. Shared with the publish gate so the two can't drift.
+      - name: Verify signatures
+        if: env.HAVE_SIGNING == 'true'
+        uses: ./.github/actions/verify-signatures
+        with:
+          bundle-dir: build/dist/Snaply
+          signer-subject-contains: ${{ env.SIGNER_SUBJECT_CONTAINS }}
+
+      - name: Warn if unsigned
+        if: env.HAVE_SIGNING != 'true'
+        run: echo "::warning::Signing secrets absent - publishing UNSIGNED binaries (SmartScreen will warn end users). See docs/SIGNING.md to enable."
+
+      - name: Upload signed bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist-signed
+          path: build/dist/Snaply
+          retention-days: 1
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # 3) Zip + checksum the signed bundle, attest, and attach to the Release.
+  # ---------------------------------------------------------------------------
+  publish:
+    needs: sign
+    if: ${{ inputs.publish }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    # Second approval gate on the irreversible step: the GitHub Release is
+    # immutable, so publishing requires its own explicit human approval in the
+    # `release` environment, distinct from the `sign` approval.
+    environment: release
+    permissions:
+      contents: write # create the GitHub Release + upload assets
+      id-token: write # OIDC token for keyless Sigstore signing (attestations)
+      attestations: write # write build-provenance + SBOM attestations
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.REF }}
+      - uses: ./.github/actions/setup-dotnet-mise
+
+      - name: Download signed bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist-signed
+          path: build/dist/Snaply
+
+      # Gate at the irreversible boundary: a real publish must ship signed
+      # binaries. If the signing secrets were absent the sign job only warned and
+      # passed the bundle through UNSIGNED — fail HERE, before any attestation or
+      # the immutable Release.
+      - name: Require the bundle to be signed before publishing
+        uses: ./.github/actions/verify-signatures
+        with:
+          bundle-dir: build/dist/Snaply
+          signer-subject-contains: ${{ env.SIGNER_SUBJECT_CONTAINS }}
+
+      - name: Download SBOM
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sbom
+          path: build/sbom
+
+      # Zip + checksum the (now-signed) bundle WITHOUT rebuilding it (that would
+      # discard the signatures). Names snaply-vX.Y.Z-win-x64.zip + SHA256SUMS.txt.
+      - name: Package (zip + checksums)
+        run: mise exec -- just package-existing "${{ env.TAG }}"
+
+      # Build provenance + SBOM attestations for the published artifacts. Keyless
+      # via the workflow's OIDC token (no stored secrets).
+      # Verify: gh attestation verify <zip> --repo P4suta/Snaply
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            build/package/snaply-*-win-x64.zip
+            build/package/SHA256SUMS.txt
+
+      - name: Attest SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: build/package/snaply-*-win-x64.zip
+          sbom-path: build/sbom/snaply.cdx.json
+
+      # release-please created this release as a DRAFT (config "draft": true).
+      # softprops uploads the files and THEN publishes the draft (the order
+      # immutable releases require). Publishing creates the vX.Y.Z tag. The notes
+      # are release-please's, so we don't regenerate them.
+      - name: Publish the draft release with the signed assets
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        with:
+          tag_name: ${{ env.TAG }}
+          files: |
+            build/package/snaply-*-win-x64.zip
+            build/package/SHA256SUMS.txt
+            build/sbom/snaply.cdx.json

@@ -1,0 +1,13 @@
+# typos-cli configuration (hygiene job in ci.yml).
+[default.extend-words]
+# Project vocabulary that would otherwise trip the spell-checker.
+Snaply = "Snaply"
+WGC = "WGC"          # Windows.Graphics.Capture
+OKLCH = "OKLCH"      # perceptual colour space for the auto background
+apphost = "apphost"  # the .NET application host stub
+
+[files]
+# Generated output (bundle, docfx site, mutation output) is not our prose.
+# typos scans the working tree, not just tracked files, so exclude these here
+# in addition to .gitignore.
+extend-exclude = ["build/", "docs/_site/", "docs/api/", "StrykerOutput/"]

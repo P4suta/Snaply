@@ -1,0 +1,23 @@
+name: Gate on job results
+description: >-
+  Fail if any of the comma-joined job results is `failure` or `cancelled`
+  (treating `skipped` as success). Used by the ci-required aggregator to gate a
+  single required status check on the whole job graph.
+inputs:
+  results:
+    description: The comma-joined `needs.*.result` string to check.
+    required: true
+runs:
+  using: composite
+  steps:
+    # Pass the results through the environment rather than interpolating into
+    # the script body — the GitHub-recommended way to avoid expression injection.
+    - shell: bash
+      env:
+        RESULTS: ${{ inputs.results }}
+      run: |
+        echo "needed results: $RESULTS"
+        if echo "$RESULTS" | tr ',' '\n' | grep -qE 'failure|cancelled'; then
+          echo "::error::a required job failed or was cancelled"
+          exit 1
+        fi

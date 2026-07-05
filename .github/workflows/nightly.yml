@@ -1,0 +1,52 @@
+# Nightly deep checks that are too slow for every PR:
+#   mutation  -> Stryker.NET mutation testing over Snaply.Core (pure logic, small
+#                surface — an ideal mutation target). Proves the tests actually
+#                catch regressions, not just execute lines.
+#   publish   -> the full `just publish` (self-contained app + Native AOT
+#                launcher) on Windows, the release path CI's lighter build skips.
+name: nightly
+
+on:
+  schedule:
+    - cron: "27 3 * * *" # daily 03:27 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-dotnet-mise
+      - name: Restore (locked)
+        run: mise exec -- dotnet restore tests/Snaply.Tests/Snaply.Tests.csproj --locked-mode
+      - name: Install Stryker.NET
+        run: mise exec -- dotnet tool install --global dotnet-stryker --version 4.6.0
+      - name: Mutation test Snaply.Core
+        working-directory: tests/Snaply.Tests
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet stryker --project Snaply.Core.csproj --break-at 60 --reporter progress --reporter html
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: stryker-report
+          path: tests/Snaply.Tests/StrykerOutput/**/reports/mutation-report.html
+          if-no-files-found: warn
+
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-dotnet-mise
+      - name: Full publish (self-contained app + AOT launcher)
+        run: mise exec -- just publish
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-bundle
+          path: build/dist/Snaply
+          if-no-files-found: error

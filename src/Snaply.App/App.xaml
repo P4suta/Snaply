@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="Snaply.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Snaply">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <!--  Design tokens → styles. Order matters: primitives, then
+                      semantic (references primitives), then styles (reference
+                      both). See Themes/Tokens.Primitives.xaml for the layering
+                      + type rules.  -->
+                <ResourceDictionary Source="ms-appx:///Themes/Tokens.Primitives.xaml" />
+                <ResourceDictionary Source="ms-appx:///Themes/Tokens.Semantic.xaml" />
+                <ResourceDictionary Source="ms-appx:///Themes/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,63 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Logs help a lot:
+        `%LOCALAPPDATA%\Snaply\logs\snaply-*.jsonl` and, if the app crashed,
+        `%LOCALAPPDATA%\Snaply\crashes\crash-*.log`. You can open the log folder
+        and copy diagnostics from Settings → Diagnostics.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did and what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+  - type: dropdown
+    id: capture-mode
+    attributes:
+      label: Capture mode
+      options:
+        - Full screen
+        - Region
+        - Window picker
+        - Not applicable
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From Settings → Diagnostics, or the release tag.
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: e.g. Windows 11 24H2 (build 26100)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log excerpts
+      description: From snaply-*.jsonl / crash-*.log or the Diagnostics panel.
+      render: shell

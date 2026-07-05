@@ -1,0 +1,43 @@
+# OpenSSF Scorecard: weekly supply-chain posture scan (pinned dependencies,
+# token permissions, branch protection, SAST coverage, dangerous-workflow
+# patterns, ...). Findings surface under Security > Code scanning; publish_results
+# feeds the public Scorecard API that backs the README badge. Public repo only.
+name: scorecard
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: "41 5 * * 1" # Mondays, offset from the other weekly jobs
+  push:
+    branches: [main]
+
+# Least privilege at the top; the job below grants only what Scorecard needs.
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      security-events: write # upload the SARIF result to code scanning
+      id-token: write # publish results to the public Scorecard API (badge)
+      contents: read
+      actions: read # read workflow files for the token / pinned-deps checks
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false # Scorecard recommendation (no creds in checkout)
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      # Surface findings in the Security tab (and as PR/commit annotations).
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          sarif_file: results.sarif
