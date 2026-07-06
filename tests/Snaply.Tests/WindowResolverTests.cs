@@ -214,7 +214,7 @@ public class WindowResolverTests
     [Fact]
     public void Resolve_TitleAndProcess_OnlyOneMatches_IsNotFound()
     {
-        // The two filters are ANDed: a window matching the title but not the process is no match.
+        // The two filters combine with AND: a window matching the title but not the process is no match.
         var windows = new FakeWindows(Window(0x1, "Inbox", "thunderbird"));
         var resolver = new WindowResolver(windows, new FakeMonitors());
 
