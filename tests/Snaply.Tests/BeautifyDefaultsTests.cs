@@ -80,6 +80,37 @@ public class BeautifyDefaultsTests
         Assert.NotEqual(a, b); // a little randomness so repeats aren't identical
     }
 
+    [Fact]
+    public void SuggestBackground_DegenerateImage_StillReturnsDeterministicGradient()
+    {
+        // A 0x0 / malformed buffer falls back to a neutral grey seed, but must still yield a
+        // deterministic two-tone gradient rather than throwing or returning a flat fill.
+        var empty = new CapturedImage(new PhysicalSize(0, 0), Array.Empty<byte>(), Dpi.Default);
+
+        var a = Assert.IsType<Background.LinearGradient>(BeautifyDefaults.SuggestBackground(empty));
+        var b = Assert.IsType<Background.LinearGradient>(BeautifyDefaults.SuggestBackground(empty));
+
+        Assert.Equal(a, b);
+        Assert.NotEqual(a.Start, a.End);
+    }
+
+    [Fact]
+    public void SuggestBackground_SaltZero_IsTheDeterministicBaseline()
+    {
+        CapturedImage image = SolidImage(220, 40, 40);
+
+        Assert.Equal(BeautifyDefaults.SuggestBackground(image, salt: 0), BeautifyDefaults.SuggestBackground(image, salt: 0));
+    }
+
+    [Fact]
+    public void SuggestBackground_ProducesOpaqueStops()
+    {
+        var gradient = (Background.LinearGradient)BeautifyDefaults.SuggestBackground(SolidImage(120, 200, 60));
+
+        Assert.Equal(255, gradient.Start.A);
+        Assert.Equal(255, gradient.End.A);
+    }
+
     private static CapturedImage SolidImage(byte r, byte g, byte b)
     {
         var size = new PhysicalSize(8, 8);

@@ -64,7 +64,12 @@ Returns a JSON array of monitors. Each entry carries an `index`, a `primary` fla
 
 Read-only. No arguments.
 
-Returns a JSON array of top-level windows, ordered **front-to-back**. Each entry is `{ handle, title, bounds }`, where `handle` is a hex window handle (e.g. `"0x00A2"`) and `bounds` is `{ x, y, width, height }`. Use `handle` or a `title` substring to target `capture_window`.
+Returns a JSON array of top-level windows, ordered **front-to-back**. Each entry is
+`{ handle, title, processName, processId, className, owner, foreground, bounds }`, where `handle`
+is a hex window handle (e.g. `"0x00A2"`), `owner` is the hex root-owner handle (or omitted when the
+window owns itself), `foreground: true` marks the active window, and `bounds` is
+`{ x, y, width, height }`. Pass the `handle` to `capture_window` for an **exact** target; a
+`title`/`process` selector is convenient but may match several windows.
 
 ### `capture_fullscreen`
 
@@ -73,7 +78,7 @@ Captures an entire monitor.
 | Argument | Type | Default | Notes |
 |---|---|---|---|
 | `monitor` | int | `0` | Monitor index (`0` = primary). Matches `list_monitors` `index`. |
-| `beautify` | bool | `true` | Set `false` to keep the raw screenshot. |
+| `beautify` | bool | `false` | **Off by default** — returns the raw screenshot (best for reading UI). Set `true` for the styled frame. |
 | `background` | string | *(auto)* | See [beautify grammar](#beautify-argument-grammar). |
 | `padding` | string | *(auto)* | |
 | `cornerRadius` | string | *(auto)* | |
@@ -81,6 +86,7 @@ Captures an entire monitor.
 | `aspect` | string | *(auto)* | |
 | `output` | `"image"` \| `"file"` | `"image"` | See [return shapes](#return-shapes). |
 | `path` | string | — | Required semantics only when `output="file"`. |
+| `delayMs` | int | `0` | Wait this many ms before capturing (let the UI settle first). |
 | `confirmed` | bool | `false` | Required in `prompt-once` mode. See [consent](#consent-model). |
 
 ### `capture_region`
@@ -93,21 +99,32 @@ Captures a rectangle in physical pixels.
 | `y` | int | — | Top, physical px. |
 | `width` | int | — | Must be `> 0`. |
 | `height` | int | — | Must be `> 0`. |
-| `beautify` / `background` / `padding` / `cornerRadius` / `shadow` / `aspect` | | | Same as above. |
-| `output` / `path` / `confirmed` | | | Same as above. |
+| `beautify` (default `false`) / `background` / `padding` / `cornerRadius` / `shadow` / `aspect` | | | Same as above. |
+| `output` / `path` / `delayMs` / `confirmed` | | | Same as above. |
 
 ### `capture_window`
 
-Captures a single window.
+Captures a top-level window — the one you name, or the active one.
 
 | Argument | Type | Default | Notes |
 |---|---|---|---|
-| `handle` | string | — | Hex window handle from `list_windows`. |
-| `title` | string | — | Title substring. |
-| `beautify` / `background` / `padding` / `cornerRadius` / `shadow` / `aspect` | | | Same as above. |
-| `output` / `path` / `confirmed` | | | Same as above. |
+| `handle` | string | — | Hex (or decimal) window handle from `list_windows`. **Exact** target. |
+| `title` | string | — | Match windows whose title contains this text. |
+| `process` | string | — | Match windows owned by this process (name, `.exe` optional). |
+| `active` | bool | `false` | Capture the foreground window (also the default when no target is given). |
+| `includePopups` | bool | `false` | Also capture the window's owned dialogs/popups (file picker, menus) as **one** image. |
+| `beautify` (default `false`) / `background` / `padding` / `cornerRadius` / `shadow` / `aspect` | | | Same as above. |
+| `output` / `path` / `delayMs` / `confirmed` | | | Same as above. |
 
-Provide **either** `handle` or `title` to select the target window.
+**Targeting precedence:** `handle` (exact) → `active` → `title`/`process` filters (combinable). With
+none given, the **foreground** window is captured. A `title`/`process` selector that matches more than
+one window does **not** silently pick the first — the call fails with code `capture.window.ambiguous`
+and a `candidates` array (`{ handle, title, processName, bounds }`); retry with a specific `handle`.
+
+**`includePopups`** composes the window with its owned popups into a single region capture, so a file
+picker or dialog sitting *in front of* the app is included — a plain window capture would only show the
+app's own surface. Pair it with `delayMs` to open a menu/dialog first, e.g. `{ "active": true,
+"includePopups": true, "delayMs": 800 }`.
 
 ### Return shapes
 
@@ -123,17 +140,17 @@ Both capture output modes also carry machine-readable `StructuredContent` on the
 
 ### Errors
 
-A failed tool call returns a `CallToolResult` with `IsError: true` and a payload of `{ code, message }`. Denied captures use the code `consent.denied` (see below).
+A failed tool call returns a `CallToolResult` with `IsError: true` and a payload of `{ code, message }`. Denied captures use the code `consent.denied` (see below). An ambiguous `capture_window` selector uses `capture.window.ambiguous` and additionally carries a `candidates` array so the AI can retry with an exact `handle`.
 
 ---
 
 ## Beautify argument grammar
 
-The capture tools accept the **same string grammar as the Snaply CLI**. Each maps 1:1 to the Core `BeautifySpec`. When an argument is omitted, Snaply auto-derives a sensible value from the capture (padding, corner radius, and `background:auto` are all inferred).
+The capture tools accept the **same string grammar as the Snaply CLI**. Each maps 1:1 to the Core `BeautifySpec`. Beautify is **off by default on the MCP surface** (the AI usually wants faithful pixels); pass `beautify: true` to enable it, and the other arguments then auto-derive sensible values from the capture when omitted (padding, corner radius, and `background:auto` are all inferred).
 
 | Argument | Grammar | Examples |
 |---|---|---|
-| `beautify` | boolean | `false` keeps the raw screenshot (equivalent to CLI `--no-beautify`) |
+| `beautify` | boolean | `true` enables the styled frame; omit/`false` keeps the raw screenshot |
 | `background` | `auto` \| `solid:#RRGGBB[AA]` \| `gradient:#RRGGBB,#RRGGBB@135` \| `image:<path>` | `solid:#1E1E1E`, `gradient:#FF0080,#7928CA@135` |
 | `padding` | `N` or `L,T,R,B` (physical px) | `48`, `40,60,40,60` |
 | `cornerRadius` | `n` (physical px) | `24` |

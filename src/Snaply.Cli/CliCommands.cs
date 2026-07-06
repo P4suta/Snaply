@@ -28,6 +28,7 @@ internal static class CliCommands
     private static readonly Option<string?> OutOption = new("--out", "-o") { Description = "Save the PNG to this path." };
     private static readonly Option<bool> ClipboardOption = new("--clipboard", "-c") { Description = "Copy the PNG to the clipboard." };
     private static readonly Option<bool> StdoutOption = new("--stdout") { Description = "Write raw PNG bytes to stdout (human text goes to stderr)." };
+    private static readonly Option<int> DelayOption = new("--delay") { Description = "Wait this many milliseconds before capturing (open a menu/dialog first)." };
 
     /// <summary>Builds the root command with every subcommand wired to <paramref name="provider"/>.</summary>
     /// <param name="provider">The composed service provider.</param>
@@ -53,16 +54,18 @@ internal static class CliCommands
         var monitorOption = new Option<int>("--monitor", "-m") { Description = "Monitor index (0 = primary)." };
         var full = new Command("full", "Capture a full monitor.") { monitorOption };
         AddBeautifyAndOutput(full);
+        full.Options.Add(DelayOption);
         full.SetAction((parseResult, ct) =>
             RunCaptureAsync(provider, parseResult, "capture.full", new CaptureTarget.Monitor(parseResult.GetValue(monitorOption)), ct));
 
         var regionArgument = new Argument<string>("region") { Description = "Region as x,y,w,h in physical pixels." };
         var region = new Command("region", "Capture a rectangular region.") { regionArgument };
         AddBeautifyAndOutput(region);
+        region.Options.Add(DelayOption);
         region.SetAction(async (parseResult, ct) =>
         {
             OutputContext output = Output(parseResult);
-            Result<PhysicalRect> rect = ParseRegion(parseResult.GetValue(regionArgument));
+            Result<PhysicalRect> rect = CaptureArguments.ParseRegion(parseResult.GetValue(regionArgument));
             if (rect.IsFailure)
             {
                 return await output.FailAsync("capture.region", rect.Error).ConfigureAwait(true);
@@ -71,21 +74,54 @@ internal static class CliCommands
             return await RunCaptureCoreAsync(provider, output, parseResult, "capture.region", new CaptureTarget.Region(rect.Value), ct).ConfigureAwait(true);
         });
 
-        var hwndOption = new Option<long?>("--hwnd") { Description = "Target window handle (HWND) as a number." };
-        var titleOption = new Option<string?>("--title", "-t") { Description = "Match the first window whose title contains this text." };
+        var hwndOption = new Option<string?>("--hwnd") { Description = "Target window handle (HWND), e.g. 0x402C4 or decimal (from 'list windows')." };
+        var titleOption = new Option<string?>("--title", "-t") { Description = "Match windows whose title contains this text." };
+        var processOption = new Option<string?>("--process", "-P") { Description = "Match windows owned by this process (name, '.exe' optional)." };
+        var activeOption = new Option<bool>("--active") { Description = "Capture the current foreground window (the default with no selector)." };
         var pickOption = new Option<bool>("--pick") { Description = "Interactively pick a window from a list." };
-        var window = new Command("window", "Capture a single top-level window.") { hwndOption, titleOption, pickOption };
+        var withPopupsOption = new Option<bool>("--with-popups") { Description = "Include the window's dialogs/popups (file picker, menus) in one shot." };
+        var window = new Command("window", "Capture a single top-level window (or the active one).")
+        {
+            hwndOption, titleOption, processOption, activeOption, pickOption, withPopupsOption,
+        };
         AddBeautifyAndOutput(window);
+        window.Options.Add(DelayOption);
         window.SetAction(async (parseResult, ct) =>
         {
             OutputContext output = Output(parseResult);
-            Result<nint> handle = ResolveWindow(provider, output, parseResult.GetValue(hwndOption), parseResult.GetValue(titleOption), parseResult.GetValue(pickOption));
+            Result<nint> handle = ResolveWindow(
+                provider,
+                output,
+                parseResult.GetValue(hwndOption),
+                parseResult.GetValue(titleOption),
+                parseResult.GetValue(processOption),
+                parseResult.GetValue(activeOption),
+                parseResult.GetValue(pickOption));
             if (handle.IsFailure)
             {
                 return await output.FailAsync("capture.window", handle.Error).ConfigureAwait(true);
             }
 
-            return await RunCaptureCoreAsync(provider, output, parseResult, "capture.window", new CaptureTarget.Window(handle.Value), ct).ConfigureAwait(true);
+            // --with-popups composes the window with its owned dialogs/popups into one region so a
+            // file picker sitting in front of the app is captured too (a single-window capture would
+            // only show the app's own surface).
+            CaptureTarget target;
+            if (parseResult.GetValue(withPopupsOption))
+            {
+                Result<PhysicalRect> group = provider.GetRequiredService<WindowResolver>().ResolveGroupRegion(handle.Value);
+                if (group.IsFailure)
+                {
+                    return await output.FailAsync("capture.window", group.Error).ConfigureAwait(true);
+                }
+
+                target = new CaptureTarget.Region(group.Value);
+            }
+            else
+            {
+                target = new CaptureTarget.Window(handle.Value);
+            }
+
+            return await RunCaptureCoreAsync(provider, output, parseResult, "capture.window", target, ct).ConfigureAwait(true);
         });
 
         capture.Subcommands.Add(full);
@@ -145,6 +181,11 @@ internal static class CliCommands
             {
                 handle = Hex(w.Handle),
                 title = w.Title,
+                processName = w.ProcessName,
+                processId = w.ProcessId,
+                className = w.ClassName,
+                owner = w.OwnerHandle == 0 ? null : Hex(w.OwnerHandle),
+                foreground = w.IsForeground,
                 bounds = new { x = w.Bounds.X, y = w.Bounds.Y, width = w.Bounds.Width, height = w.Bounds.Height },
             }).ToArray();
 
@@ -152,12 +193,16 @@ internal static class CliCommands
             {
                 var table = new Table().Border(TableBorder.Rounded);
                 table.AddColumn("Handle");
+                table.AddColumn("Process");
                 table.AddColumn("Size");
                 table.AddColumn("Title");
                 foreach (WindowInfo w in found)
                 {
+                    string process = w.ProcessName.Length == 0 ? "[grey]?[/]" : Markup.Escape(w.ProcessName);
+                    string marker = w.IsForeground ? " [green]●[/]" : string.Empty;
                     table.AddRow(
-                        Markup.Escape(Hex(w.Handle)),
+                        Markup.Escape(Hex(w.Handle)) + marker,
+                        process,
                         $"{w.Bounds.Width}×{w.Bounds.Height}",
                         Markup.Escape(w.Title));
                 }
@@ -232,7 +277,9 @@ internal static class CliCommands
         }
 
         var outputs = new OutputTargets(parseResult.GetValue(OutOption), parseResult.GetValue(ClipboardOption), parseResult.GetValue(StdoutOption));
-        return await CaptureExecutor.ExecuteAsync(provider, output, command, target, spec.Value, outputs, ct).ConfigureAwait(true);
+
+        // Every capture verb carries --delay; the beautify verb writes via its own path, not here.
+        return await CaptureExecutor.ExecuteAsync(provider, output, command, target, spec.Value, outputs, parseResult.GetValue(DelayOption), ct).ConfigureAwait(true);
     }
 
     private static async Task<int> WriteBeautifiedAsync(IServiceProvider provider, OutputContext output, ParseResult parseResult, CapturedImage image, bool beautified, CancellationToken ct)
@@ -314,37 +361,70 @@ internal static class CliCommands
         }).ConfigureAwait(true);
     }
 
-    private static Result<nint> ResolveWindow(IServiceProvider provider, OutputContext output, long? hwnd, string? title, bool pick)
+    private static Result<nint> ResolveWindow(IServiceProvider provider, OutputContext output, string? hwnd, string? title, string? process, bool active, bool pick)
     {
+        bool hasHandle = !string.IsNullOrWhiteSpace(hwnd);
         bool hasTitle = !string.IsNullOrWhiteSpace(title);
-        int specified = (hwnd is not null ? 1 : 0) + (hasTitle ? 1 : 0) + (pick ? 1 : 0);
-        if (specified != 1)
+        bool hasProcess = !string.IsNullOrWhiteSpace(process);
+
+        // --pick / --hwnd / --active are alternatives; --title and --process are filters that can be
+        // combined with each other but not with an alternative.
+        int alternatives = (hasHandle ? 1 : 0) + (active ? 1 : 0) + (pick ? 1 : 0);
+        if (alternatives > 1 || (alternatives == 1 && (hasTitle || hasProcess)))
         {
-            return Result<nint>.Fail(ErrorCodes.InputInvalid, "Specify exactly one of --hwnd, --title, or --pick.");
+            return Result<nint>.Fail(ErrorCodes.InputInvalid, "Use one of --hwnd, --active, --pick, or a --title/--process filter — not a mix.");
         }
 
-        if (hwnd is not null)
+        if (pick)
         {
-            return hwnd.Value == 0
-                ? Result<nint>.Fail(ErrorCodes.InputInvalid, "Window handle must be non-zero.")
-                : Result<nint>.Ok((nint)hwnd.Value);
+            return PickWindow(provider, output);
+        }
+
+        nint? handle = null;
+        if (hasHandle)
+        {
+            Result<nint> parsed = CaptureArguments.ParseWindowHandle(hwnd!, allowEmpty: false);
+            if (parsed.IsFailure)
+            {
+                return parsed;
+            }
+
+            handle = parsed.Value;
+        }
+
+        var resolver = provider.GetRequiredService<WindowResolver>();
+        WindowResolution resolution = resolver.Resolve(new WindowQuery(
+            Handle: handle,
+            TitleContains: title,
+            ProcessName: process,
+            Active: active));
+
+        switch (resolution)
+        {
+            case WindowResolution.Resolved resolved:
+                return Result<nint>.Ok(resolved.Window.Handle);
+
+            case WindowResolution.Ambiguous ambiguous:
+                RenderCandidates(output, ambiguous.Candidates);
+                return Result<nint>.Fail(ErrorCodes.CaptureWindowAmbiguous, DescribeCandidates(ambiguous.Candidates));
+
+            case WindowResolution.NotFound notFound:
+                return Result<nint>.Fail(notFound.Error);
+
+            default:
+                return Result<nint>.Fail(ErrorCodes.CaptureWindow, "Could not resolve a window.");
+        }
+    }
+
+    private static Result<nint> PickWindow(IServiceProvider provider, OutputContext output)
+    {
+        // Interactive selection is meaningless without a human console.
+        if (output.Json || output.Quiet)
+        {
+            return Result<nint>.Fail(ErrorCodes.InputInvalid, "--pick requires an interactive terminal; use --title, --process, or --hwnd instead.");
         }
 
         IReadOnlyList<WindowInfo> windows = provider.GetRequiredService<IWindowEnumerationService>().EnumerateTopLevelWindows();
-        if (hasTitle)
-        {
-            WindowInfo? match = windows.FirstOrDefault(w => w.Title.Contains(title!, StringComparison.OrdinalIgnoreCase));
-            return match is null
-                ? Result<nint>.Fail(ErrorCodes.CaptureWindow, $"No window title contains '{title}'.")
-                : Result<nint>.Ok(match.Handle);
-        }
-
-        // --pick: interactive selection is meaningless without a human console.
-        if (output.Json || output.Quiet)
-        {
-            return Result<nint>.Fail(ErrorCodes.InputInvalid, "--pick requires an interactive terminal; use --title or --hwnd instead.");
-        }
-
         if (windows.Count == 0)
         {
             return Result<nint>.Fail(ErrorCodes.CaptureWindow, "No capturable windows were found.");
@@ -359,29 +439,34 @@ internal static class CliCommands
         return Result<nint>.Ok(chosen.Handle);
     }
 
-    private static Result<PhysicalRect> ParseRegion(string? value)
+    private static void RenderCandidates(OutputContext output, IReadOnlyList<WindowInfo> candidates)
     {
-        if (string.IsNullOrWhiteSpace(value))
+        if (output.Json || output.Quiet)
         {
-            return Result<PhysicalRect>.Fail(ErrorCodes.InputInvalid, "A region 'x,y,w,h' is required.");
+            return;
         }
 
-        string[] parts = value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 4
-            || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int x)
-            || !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int y)
-            || !int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int w)
-            || !int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int h))
+        output.Status.MarkupLine("[yellow]Several windows matched — re-run with --hwnd <handle>:[/]");
+        var table = new Table().Border(TableBorder.Rounded);
+        table.AddColumn("Handle");
+        table.AddColumn("Process");
+        table.AddColumn("Title");
+        foreach (WindowInfo w in candidates)
         {
-            return Result<PhysicalRect>.Fail(ErrorCodes.InputInvalid, $"Region must be four integers 'x,y,w,h' (got '{value}').");
+            table.AddRow(
+                Markup.Escape(Hex(w.Handle)),
+                w.ProcessName.Length == 0 ? "[grey]?[/]" : Markup.Escape(w.ProcessName),
+                Markup.Escape(Truncate(w.Title, 60)));
         }
 
-        if (w <= 0 || h <= 0)
-        {
-            return Result<PhysicalRect>.Fail(ErrorCodes.InputInvalid, "Region width and height must be positive.");
-        }
+        output.Status.Write(table);
+    }
 
-        return Result<PhysicalRect>.Ok(new PhysicalRect(x, y, w, h));
+    private static string DescribeCandidates(IReadOnlyList<WindowInfo> candidates)
+    {
+        IEnumerable<string> listed = candidates.Take(8).Select(w => $"{Hex(w.Handle)} '{Truncate(w.Title, 40)}' ({w.ProcessName})");
+        string suffix = candidates.Count > 8 ? $", +{candidates.Count - 8} more" : string.Empty;
+        return $"{candidates.Count} windows matched: {string.Join("; ", listed)}{suffix}. Re-run with --hwnd <handle>.";
     }
 
     private static OutputContext Output(ParseResult parseResult) => Globals.Output(parseResult);

@@ -13,6 +13,9 @@ public static class ErrorCodes
     /// <summary>Window capture failed (invalid handle or capture error).</summary>
     public const string CaptureWindow = "capture.window";
 
+    /// <summary>A window selector (title/process) matched more than one window; caller must disambiguate.</summary>
+    public const string CaptureWindowAmbiguous = "capture.window.ambiguous";
+
     /// <summary>Region capture failed (invalid region, no monitor, or capture error).</summary>
     public const string CaptureRegion = "capture.region";
 

@@ -28,6 +28,7 @@ internal sealed class SnaplyMcpTools
     private readonly IExportService _export;
     private readonly IWindowEnumerationService _windows;
     private readonly IMonitorEnumerationService _monitors;
+    private readonly WindowResolver _resolver;
     private readonly CapturePolicy _policy;
 
     /// <summary>Creates the tool set with the shared use cases injected from DI.</summary>
@@ -36,6 +37,7 @@ internal sealed class SnaplyMcpTools
     /// <param name="export">The image export service (PNG encode / save).</param>
     /// <param name="windows">The window enumerator.</param>
     /// <param name="monitors">The monitor enumerator.</param>
+    /// <param name="resolver">The shared window resolver (targeting + group regions).</param>
     /// <param name="policy">The capture consent policy.</param>
     public SnaplyMcpTools(
         CapturePipeline pipeline,
@@ -43,6 +45,7 @@ internal sealed class SnaplyMcpTools
         IExportService export,
         IWindowEnumerationService windows,
         IMonitorEnumerationService monitors,
+        WindowResolver resolver,
         CapturePolicy policy)
     {
         _pipeline = pipeline;
@@ -50,6 +53,7 @@ internal sealed class SnaplyMcpTools
         _export = export;
         _windows = windows;
         _monitors = monitors;
+        _resolver = resolver;
         _policy = policy;
     }
 
@@ -68,23 +72,28 @@ internal sealed class SnaplyMcpTools
     }
 
     [McpServerTool(Name = "list_windows")]
-    [Description("List capturable top-level windows (front to back). Pass a returned 'handle' to capture_window.")]
+    [Description("List capturable top-level windows (front to back). Pass a returned 'handle' to capture_window for an exact target; 'process'/'title' may match several. 'foreground':true marks the active window.")]
     public CallToolResult ListWindows()
     {
         object data = _windows.EnumerateTopLevelWindows().Select(w => new
         {
             handle = ToHex(w.Handle),
             title = w.Title,
+            processName = w.ProcessName,
+            processId = w.ProcessId,
+            className = w.ClassName,
+            owner = w.OwnerHandle == 0 ? null : ToHex(w.OwnerHandle),
+            foreground = w.IsForeground,
             bounds = new { x = w.Bounds.X, y = w.Bounds.Y, width = w.Bounds.Width, height = w.Bounds.Height },
         }).ToArray();
         return Json(data);
     }
 
     [McpServerTool(Name = "capture_fullscreen")]
-    [Description("Capture a full monitor and (by default) beautify it. Returns the PNG image, or saves it when output='file'. Requires capture consent.")]
+    [Description("Capture a full monitor. Returns the raw PNG by default (best for reading UI); pass beautify:true for the styled look. Returns the image, or saves it when output='file'. Requires capture consent.")]
     public Task<CallToolResult> CaptureFullscreen(
         [Description("Monitor index (0 = primary).")] int monitor = 0,
-        [Description("Apply the automatic beautify styling.")] bool beautify = true,
+        [Description("Apply the automatic beautify styling (padding/background/shadow). Off by default.")] bool beautify = false,
         [Description("auto | solid:#RRGGBB | gradient:#RRGGBB,#RRGGBB@135 | image:<path>")] string? background = null,
         [Description("Padding: N or L,T,R,B (physical px).")] string? padding = null,
         [Description("Corner radius in physical px.")] double? cornerRadius = null,
@@ -92,18 +101,19 @@ internal sealed class SnaplyMcpTools
         [Description("auto | square | standard | wide")] string? aspect = null,
         [Description("'image' returns the PNG; 'file' saves it to 'path'.")] string output = "image",
         [Description("Destination path when output='file'.")] string? path = null,
+        [Description("Wait this many milliseconds before capturing (let UI settle first).")] int delayMs = 0,
         [Description("Must be true when the server runs in prompt-once consent mode.")] bool confirmed = false,
         CancellationToken cancellationToken = default) =>
-        CaptureAsync(new CaptureTarget.Monitor(monitor), beautify, background, padding, cornerRadius, shadow, aspect, output, path, confirmed, cancellationToken);
+        CaptureAsync(new CaptureTarget.Monitor(monitor), beautify, background, padding, cornerRadius, shadow, aspect, output, path, delayMs, confirmed, cancellationToken);
 
     [McpServerTool(Name = "capture_region")]
-    [Description("Capture a rectangular region of the virtual desktop (physical pixels) and (by default) beautify it. Requires capture consent.")]
+    [Description("Capture a rectangular region of the virtual desktop (physical pixels). Returns the raw PNG by default; pass beautify:true for the styled look. Requires capture consent.")]
     public Task<CallToolResult> CaptureRegion(
         [Description("Left edge (physical px).")] int x,
         [Description("Top edge (physical px).")] int y,
         [Description("Width (physical px, > 0).")] int width,
         [Description("Height (physical px, > 0).")] int height,
-        [Description("Apply the automatic beautify styling.")] bool beautify = true,
+        [Description("Apply the automatic beautify styling (padding/background/shadow). Off by default.")] bool beautify = false,
         [Description("auto | solid:#RRGGBB | gradient:#RRGGBB,#RRGGBB@135 | image:<path>")] string? background = null,
         [Description("Padding: N or L,T,R,B (physical px).")] string? padding = null,
         [Description("Corner radius in physical px.")] double? cornerRadius = null,
@@ -111,6 +121,7 @@ internal sealed class SnaplyMcpTools
         [Description("auto | square | standard | wide")] string? aspect = null,
         [Description("'image' returns the PNG; 'file' saves it to 'path'.")] string output = "image",
         [Description("Destination path when output='file'.")] string? path = null,
+        [Description("Wait this many milliseconds before capturing (let UI settle first).")] int delayMs = 0,
         [Description("Must be true when the server runs in prompt-once consent mode.")] bool confirmed = false,
         CancellationToken cancellationToken = default)
     {
@@ -119,15 +130,18 @@ internal sealed class SnaplyMcpTools
             return Task.FromResult(Error(ErrorCodes.InputInvalid, "Region width and height must be positive."));
         }
 
-        return CaptureAsync(new CaptureTarget.Region(new PhysicalRect(x, y, width, height)), beautify, background, padding, cornerRadius, shadow, aspect, output, path, confirmed, cancellationToken);
+        return CaptureAsync(new CaptureTarget.Region(new PhysicalRect(x, y, width, height)), beautify, background, padding, cornerRadius, shadow, aspect, output, path, delayMs, confirmed, cancellationToken);
     }
 
     [McpServerTool(Name = "capture_window")]
-    [Description("Capture a single top-level window by handle (from list_windows) or title substring, and (by default) beautify it. Requires capture consent.")]
+    [Description("Capture a top-level window. Target it by 'handle' (exact, from list_windows), 'title' substring, or 'process' name; with none given the active/foreground window is used. Set includePopups:true to also grab its file picker / dialog / menu. Returns the raw PNG by default. If a title/process matches several windows the call fails with a 'candidates' list — retry with a handle. Requires capture consent.")]
     public Task<CallToolResult> CaptureWindow(
-        [Description("Window handle, e.g. '0x00A2' from list_windows.")] string? handle = null,
-        [Description("Match the first window whose title contains this text.")] string? title = null,
-        [Description("Apply the automatic beautify styling.")] bool beautify = true,
+        [Description("Window handle, e.g. '0x00A2' from list_windows (exact target).")] string? handle = null,
+        [Description("Match windows whose title contains this text.")] string? title = null,
+        [Description("Match windows owned by this process (name, '.exe' optional).")] string? process = null,
+        [Description("Capture the foreground window (also the default when no target is given).")] bool active = false,
+        [Description("Also capture the window's owned dialogs/popups (file picker, menus) as one image.")] bool includePopups = false,
+        [Description("Apply the automatic beautify styling (padding/background/shadow). Off by default.")] bool beautify = false,
         [Description("auto | solid:#RRGGBB | gradient:#RRGGBB,#RRGGBB@135 | image:<path>")] string? background = null,
         [Description("Padding: N or L,T,R,B (physical px).")] string? padding = null,
         [Description("Corner radius in physical px.")] double? cornerRadius = null,
@@ -135,13 +149,44 @@ internal sealed class SnaplyMcpTools
         [Description("auto | square | standard | wide")] string? aspect = null,
         [Description("'image' returns the PNG; 'file' saves it to 'path'.")] string output = "image",
         [Description("Destination path when output='file'.")] string? path = null,
+        [Description("Wait this many milliseconds before capturing (open a menu/dialog first).")] int delayMs = 0,
         [Description("Must be true when the server runs in prompt-once consent mode.")] bool confirmed = false,
         CancellationToken cancellationToken = default)
     {
-        Result<nint> resolved = ResolveWindow(handle, title);
-        return resolved.IsFailure
-            ? Task.FromResult(Error(resolved.Error.Code, resolved.Error.Message))
-            : CaptureAsync(new CaptureTarget.Window(resolved.Value), beautify, background, padding, cornerRadius, shadow, aspect, output, path, confirmed, cancellationToken);
+        Result<nint> parsedHandle = CaptureArguments.ParseWindowHandle(handle, allowEmpty: true);
+        if (parsedHandle.IsFailure)
+        {
+            return Task.FromResult(Error(parsedHandle.Error.Code, parsedHandle.Error.Message));
+        }
+
+        WindowResolution resolution = _resolver.Resolve(new WindowQuery(
+            Handle: string.IsNullOrWhiteSpace(handle) ? null : parsedHandle.Value,
+            TitleContains: title,
+            ProcessName: process,
+            Active: active));
+
+        switch (resolution)
+        {
+            case WindowResolution.Ambiguous ambiguous:
+                return Task.FromResult(AmbiguousError(ambiguous.Candidates));
+
+            case WindowResolution.NotFound notFound:
+                return Task.FromResult(Error(notFound.Error.Code, notFound.Error.Message));
+
+            case WindowResolution.Resolved resolved:
+                if (!includePopups)
+                {
+                    return CaptureAsync(new CaptureTarget.Window(resolved.Window.Handle), beautify, background, padding, cornerRadius, shadow, aspect, output, path, delayMs, confirmed, cancellationToken);
+                }
+
+                Result<PhysicalRect> group = _resolver.ResolveGroupRegion(resolved.Window.Handle);
+                return group.IsFailure
+                    ? Task.FromResult(Error(group.Error.Code, group.Error.Message))
+                    : CaptureAsync(new CaptureTarget.Region(group.Value), beautify, background, padding, cornerRadius, shadow, aspect, output, path, delayMs, confirmed, cancellationToken);
+
+            default:
+                return Task.FromResult(Error(ErrorCodes.CaptureWindow, "Could not resolve a window."));
+        }
     }
 
     private async Task<CallToolResult> CaptureAsync(
@@ -154,6 +199,7 @@ internal sealed class SnaplyMcpTools
         string? aspect,
         string output,
         string? path,
+        int delayMs,
         bool confirmed,
         CancellationToken ct)
     {
@@ -178,6 +224,11 @@ internal sealed class SnaplyMcpTools
         if (spec.IsFailure)
         {
             return Error(spec.Error.Code, spec.Error.Message);
+        }
+
+        if (delayMs > 0)
+        {
+            await Task.Delay(delayMs, ct).ConfigureAwait(false);
         }
 
         Result<CapturedImage> captured = await CaptureImageAsync(target, spec.Value, ct).ConfigureAwait(false);
@@ -240,31 +291,28 @@ internal sealed class SnaplyMcpTools
         };
     }
 
-    private Result<nint> ResolveWindow(string? handle, string? title)
+    // A structured ambiguity error: the candidate windows are returned so the AI can retry with an
+    // exact handle instead of a title/process selector that matched several windows.
+    private static CallToolResult AmbiguousError(IReadOnlyList<WindowInfo> candidates)
     {
-        bool hasHandle = !string.IsNullOrWhiteSpace(handle);
-        bool hasTitle = !string.IsNullOrWhiteSpace(title);
-        if (hasHandle == hasTitle)
+        var payload = new
         {
-            return Result<nint>.Fail(ErrorCodes.InputInvalid, "Specify exactly one of 'handle' or 'title'.");
-        }
-
-        if (hasHandle)
-        {
-            string trimmed = handle!.Trim();
-            bool hex = trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
-            if (!long.TryParse(hex ? trimmed[2..] : trimmed, hex ? System.Globalization.NumberStyles.HexNumber : System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long value) || value == 0)
+            code = ErrorCodes.CaptureWindowAmbiguous,
+            message = $"{candidates.Count} windows matched. Retry capture_window with one of these 'handle' values.",
+            candidates = candidates.Select(w => new
             {
-                return Result<nint>.Fail(ErrorCodes.InputInvalid, $"Invalid window handle '{handle}'.");
-            }
-
-            return Result<nint>.Ok((nint)value);
-        }
-
-        WindowInfo? match = _windows.EnumerateTopLevelWindows().FirstOrDefault(w => w.Title.Contains(title!, StringComparison.OrdinalIgnoreCase));
-        return match is null
-            ? Result<nint>.Fail(ErrorCodes.CaptureWindow, $"No window title contains '{title}'.")
-            : Result<nint>.Ok(match.Handle);
+                handle = ToHex(w.Handle),
+                title = w.Title,
+                processName = w.ProcessName,
+                bounds = new { x = w.Bounds.X, y = w.Bounds.Y, width = w.Bounds.Width, height = w.Bounds.Height },
+            }).ToArray(),
+        };
+        return new CallToolResult
+        {
+            IsError = true,
+            StructuredContent = JsonSerializer.SerializeToElement(payload, JsonOptions),
+            Content = [new TextContentBlock { Text = JsonSerializer.Serialize(payload, JsonOptions) }],
+        };
     }
 
     private static CallToolResult Json(object data) => new()

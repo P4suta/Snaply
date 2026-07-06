@@ -56,4 +56,43 @@ public class ResultTests
         Assert.True(mapped.IsFailure);
         Assert.Same(cause, mapped.Error.Cause);
     }
+
+    [Fact]
+    public void Ok_CarriesValueAndIsSuccess()
+    {
+        Result<int> result = Result<int>.Ok(42);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.IsFailure);
+        Assert.Equal(42, result.Value);
+    }
+
+    [Fact]
+    public void Value_OnFailure_ThrowsWithTheErrorInTheMessage()
+    {
+        Result<int> failed = Result<int>.Fail(ErrorCodes.ExportSave, "save failed");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => failed.Value);
+        Assert.Contains(ErrorCodes.ExportSave, ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Map_OnSuccess_TransformsTheValue()
+    {
+        Result<int> ok = Result<int>.Ok(21);
+
+        Result<int> mapped = ok.Map(v => v * 2);
+
+        Assert.True(mapped.IsSuccess);
+        Assert.Equal(42, mapped.Value);
+    }
+
+    [Fact]
+    public void NonGenericOk_IsSuccess()
+    {
+        Result result = Result.Ok();
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.IsFailure);
+    }
 }
