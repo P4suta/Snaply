@@ -78,11 +78,11 @@ Convenience `just` recipes wrap the common flows:
 
 ```
 snaply
-├── capture
+├── capture                                     (every verb also takes --delay <ms>)
 │   ├── full [--monitor N]                      Capture a whole monitor (default 0 = primary)
 │   ├── region <x,y,w,h>                         Capture a pixel rectangle (physical px; w,h > 0)
-│   └── window [--hwnd N | --title <substr> | --pick]
-│                                                Capture one window (choose exactly one selector)
+│   └── window [--hwnd H | --title <substr> | --process <name> | --active | --pick] [--with-popups]
+│                                                Capture one window (or the active one)
 ├── beautify --in <file>                         Beautify an existing image file
 ├── list
 │   ├── windows                                  List capturable windows, front-to-back
@@ -112,15 +112,35 @@ argument: `x,y,width,height`. Both `width` and `height` must be greater than 0.
 snaply capture region 100,100,1280,720 --out region.png
 ```
 
-### `snaply capture window [--hwnd N | --title <substr> | --pick]`
+### `snaply capture window [--hwnd H | --title <substr> | --process <name> | --active | --pick] [--with-popups]`
 
-Captures a single window. Provide **exactly one** selector:
+Captures a single window. Selectors:
 
-- `--hwnd N` — target a window by its handle (see `snaply list windows`).
-- `--title <substr>` — match the first window whose title contains `<substr>`.
+- `--hwnd H` — target a window by its handle, hex (`0x402C4`) or decimal (see
+  `snaply list windows`). The **exact** target.
+- `--title <substr>` — match windows whose title contains `<substr>`.
+- `--process <name>` — match windows owned by a process (name, `.exe` optional).
+- `--active` — capture the current foreground window. This is also the **default
+  when no selector is given**, so bare `snaply capture window` grabs what's in front.
 - `--pick` — open an interactive [Spectre](https://spectreconsole.net/)
   selection list and choose a window. Because it is interactive, `--pick` is
   **not allowed together with `--json` or `--quiet`**.
+
+`--hwnd`, `--active`, and `--pick` are alternatives; `--title` and `--process` are
+filters that can be combined with each other. If a `--title`/`--process` filter
+matches **more than one** window, the command does not silently pick the first —
+it lists the candidates and fails with `capture.window.ambiguous` (exit `15`), so
+you can re-run with the exact `--hwnd`.
+
+`--with-popups` captures the window **together with its owned dialogs/popups** —
+a file picker, modal dialog, or open menu — as one image. Without it a window
+capture shows only the app's own surface, even if a picker is sitting in front of
+it. Combine with `--delay` to open the popup first:
+
+```bash
+# Open a menu/dialog during the delay, then capture the window with it
+snaply capture window --process myapp --with-popups --delay 1500 --out withdialog.png
+```
 
 ### `snaply beautify --in <file>`
 
@@ -197,6 +217,11 @@ to the clipboard in one run.
 | `--clipboard` | `-c` | Copy the PNG to the clipboard (via an STA message-pump host) |
 | `--stdout` | | Write raw PNG bytes to stdout; all human text goes to stderr |
 
+Every `capture` verb (`full`, `region`, `window`) also accepts **`--delay <ms>`** —
+wait that many milliseconds before capturing. Use it to let a UI animation settle,
+or to open a menu/dialog by hand before the shot is taken (`beautify` does not take
+it, as it captures nothing).
+
 **Defaults and rules:**
 
 - If you specify no output option and are **not** in `--json` mode, Snaply saves
@@ -269,7 +294,8 @@ can branch on either.
 ### Command-specific `data` shapes
 
 - **`list.windows`** — `data` is an array of
-  `{ "handle": "0x00A2", "title": "...", "bounds": { "x", "y", "width", "height" } }`.
+  `{ "handle": "0x00A2", "title": "...", "processName", "processId", "className", "owner", "foreground", "bounds": { "x", "y", "width", "height" } }`
+  (`owner` is the hex root-owner handle or `null`; `foreground` marks the active window).
 - **`list.monitors`** — `data` is an array of
   `{ "index", "primary", "dpi", "bounds" }`.
 - **`doctor`** — `data` is
@@ -298,6 +324,7 @@ Example `list monitors --json`:
 | `1` | Unexpected error |
 | `2` | Usage / parse error (`System.CommandLine`) or `input.invalid` |
 | `10` | Capture failed (`capture.*`) |
+| `15` | Window selector matched several windows (`capture.window.ambiguous`) |
 | `11` | Beautify render failed (`beautify.render`) |
 | `12` | Export to file failed (`export.save`) |
 | `13` | Export to clipboard failed (`export.clipboard`) |

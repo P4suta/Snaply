@@ -12,6 +12,10 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- Property-based testing (FsCheck.Xunit's [Property]) for the geometry/algebraic
+         invariants — Union/Intersect commutativity & associativity, ToPhysical edge-tiling —
+         that representative-value [Theory] cases can only sample. Integrates with xUnit v2. -->
+    <PackageReference Include="FsCheck.Xunit" Version="3.*" />
   </ItemGroup>
 
   <ItemGroup>
