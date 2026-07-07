@@ -189,6 +189,31 @@ public class BeautifySpecMapperTests
         Assert.True(BeautifySpecMapper.Map(new BeautifyOptions(Shadow: shadow)).IsFailure);
     }
 
+    [Fact]
+    public void Shadow_OpacityIsClampedToUnitRange()
+    {
+        Assert.Equal(1.0, MapOk(new BeautifyOptions(Shadow: "0,0,10,5")).Shadow.Opacity);
+        Assert.Equal(0.0, MapOk(new BeautifyOptions(Shadow: "0,0,10,-2")).Shadow.Opacity);
+    }
+
+    [Theory]
+    [InlineData("gradient:#000000,#ffffff@-45", -45)]
+    [InlineData("gradient:#000000,#ffffff@22.5", 22.5)]
+    public void Gradient_AngleAcceptsNegativeAndDecimal(string background, double expectedAngle)
+    {
+        var gradient = Assert.IsType<Background.LinearGradient>(MapOk(new BeautifyOptions(Background: background)).Background);
+        Assert.Equal(expectedAngle, gradient.AngleDegrees);
+    }
+
+    [Fact]
+    public void Color_UppercaseHexAndSurroundingWhitespace_AreAccepted()
+    {
+        Result<Rgba> color = BeautifySpecMapper.ParseColor("  #ABCDEF  ");
+
+        Assert.True(color.IsSuccess);
+        Assert.Equal(new Rgba(0xAB, 0xCD, 0xEF, 255), color.Value);
+    }
+
     private static BeautifySpec MapOk(BeautifyOptions options)
     {
         Result<BeautifySpec?> result = BeautifySpecMapper.Map(options);

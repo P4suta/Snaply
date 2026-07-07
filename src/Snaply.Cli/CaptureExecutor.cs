@@ -48,6 +48,7 @@ internal static class CaptureExecutor
     /// <param name="target">What to capture.</param>
     /// <param name="spec">The beautify spec, or null for a raw (un-beautified) capture.</param>
     /// <param name="outputs">Where to send the resulting PNG.</param>
+    /// <param name="delayMs">Milliseconds to wait before capturing (0 = none).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The process exit code.</returns>
     public static async Task<int> ExecuteAsync(
@@ -57,6 +58,7 @@ internal static class CaptureExecutor
         CaptureTarget target,
         BeautifySpec? spec,
         OutputTargets outputs,
+        int delayMs,
         CancellationToken ct)
     {
         output.RedirectHumanToErr = outputs.RawStdout;
@@ -72,6 +74,11 @@ internal static class CaptureExecutor
             }
 
             outputs = outputs with { OutPath = DefaultFileName() };
+        }
+
+        if (delayMs > 0)
+        {
+            await Task.Delay(delayMs, ct).ConfigureAwait(true);
         }
 
         Result<CapturedImage> captured = await WithStatusAsync(

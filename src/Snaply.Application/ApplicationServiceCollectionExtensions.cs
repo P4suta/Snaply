@@ -37,6 +37,7 @@ public static class ApplicationServiceCollectionExtensions
 
         services.AddSingleton(store);
         services.AddSingleton<CapturePipeline>();
+        services.AddSingleton<WindowResolver>();
         return services;
     }
 

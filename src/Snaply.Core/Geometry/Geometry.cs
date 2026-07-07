@@ -37,6 +37,83 @@ public readonly record struct PhysicalRect(int X, int Y, int Width, int Height)
 {
     /// <summary>The rectangle's extent as a <see cref="PhysicalSize"/>.</summary>
     public PhysicalSize Size => new(Width, Height);
+
+    /// <summary>True when the rectangle has no area (a zero or negative extent).</summary>
+    public bool IsEmpty => Width <= 0 || Height <= 0;
+
+    /// <summary>The right edge (exclusive), i.e. <see cref="X"/> + <see cref="Width"/>.</summary>
+    public int Right => X + Width;
+
+    /// <summary>The bottom edge (exclusive), i.e. <see cref="Y"/> + <see cref="Height"/>.</summary>
+    public int Bottom => Y + Height;
+
+    /// <summary>
+    /// The smallest rectangle containing both this and <paramref name="other"/>. An empty
+    /// operand is ignored (returns the other), so unioning over a mix of real and empty
+    /// windows never drags the result to the origin.
+    /// </summary>
+    /// <param name="other">The rectangle to union with.</param>
+    /// <returns>The bounding rectangle of the two.</returns>
+    public PhysicalRect Union(PhysicalRect other)
+    {
+        if (IsEmpty)
+        {
+            return other;
+        }
+
+        if (other.IsEmpty)
+        {
+            return this;
+        }
+
+        int left = Math.Min(X, other.X);
+        int top = Math.Min(Y, other.Y);
+        int right = Math.Max(Right, other.Right);
+        int bottom = Math.Max(Bottom, other.Bottom);
+        return new PhysicalRect(left, top, right - left, bottom - top);
+    }
+
+    /// <summary>
+    /// The overlap of this and <paramref name="other"/>, or an empty rectangle when they do
+    /// not intersect. Used to clamp a composite region to the monitor that will capture it.
+    /// </summary>
+    /// <param name="other">The rectangle to intersect with.</param>
+    /// <returns>The overlapping rectangle, or empty when disjoint.</returns>
+    public PhysicalRect Intersect(PhysicalRect other)
+    {
+        int left = Math.Max(X, other.X);
+        int top = Math.Max(Y, other.Y);
+        int right = Math.Min(Right, other.Right);
+        int bottom = Math.Min(Bottom, other.Bottom);
+        return right > left && bottom > top
+            ? new PhysicalRect(left, top, right - left, bottom - top)
+            : default;
+    }
+
+    /// <summary>True when the point (<paramref name="x"/>, <paramref name="y"/>) falls inside this rectangle.</summary>
+    /// <param name="x">The point's X coordinate (physical px).</param>
+    /// <param name="y">The point's Y coordinate (physical px).</param>
+    /// <returns><c>true</c> when the point is within the rectangle.</returns>
+    public bool Contains(int x, int y) => x >= X && x < Right && y >= Y && y < Bottom;
+
+    /// <summary>
+    /// The bounding rectangle of a sequence of rectangles (empty ones ignored), or an empty
+    /// rectangle when the sequence yields nothing with area.
+    /// </summary>
+    /// <param name="rects">The rectangles to bound.</param>
+    /// <returns>The smallest rectangle containing them all.</returns>
+    public static PhysicalRect Bounds(IEnumerable<PhysicalRect> rects)
+    {
+        ArgumentNullException.ThrowIfNull(rects);
+
+        PhysicalRect result = default;
+        foreach (PhysicalRect rect in rects)
+        {
+            result = result.Union(rect);
+        }
+
+        return result;
+    }
 }
 
 /// <summary>

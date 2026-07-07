@@ -132,6 +132,60 @@ public class CapturePipelineTests
         Assert.Equal(50, renderer.LastSpec.CornerRadius);
     }
 
+    [Fact]
+    public async Task Capture_RendererFailure_IsPropagated()
+    {
+        CapturedImage raw = SolidImage(640, 480);
+        var pipeline = new CapturePipeline(new FakeCapture(Result<CapturedImage>.Ok(raw)), new FailingRenderer());
+
+        Result<CapturedImage> result = await pipeline.CaptureFullScreenAsync(BeautifySpec.Default);
+
+        // A successful capture but a failed render surfaces the render error, not a false success.
+        Assert.True(result.IsFailure);
+        Assert.Equal(ErrorCodes.BeautifyRender, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task Beautify_ExternalImage_DoesNotBecomeTheCachedCapture()
+    {
+        var pipeline = new CapturePipeline(new FakeCapture(), new RecordingRenderer());
+
+        await pipeline.BeautifyAsync(SolidImage(320, 240), BeautifySpec.Default);
+
+        // Beautifying a file (the CLI 'beautify' verb) must not enable live re-render of a capture.
+        Assert.False(pipeline.HasCapture);
+    }
+
+    [Fact]
+    public async Task Capture_CancelledToken_PropagatesCancellation()
+    {
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        var pipeline = new CapturePipeline(new CancellationAwareCapture(), new RecordingRenderer());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => pipeline.CaptureFullScreenAsync(BeautifySpec.Default, cts.Token));
+    }
+
+    [Fact]
+    public async Task Rerender_WithAutoBackground_IsStableAcrossReRenders()
+    {
+        CapturedImage raw = SolidImage(800, 600);
+        var renderer = new RecordingRenderer();
+        var pipeline = new CapturePipeline(new FakeCapture(Result<CapturedImage>.Ok(raw)), renderer);
+
+        BeautifySpec auto = BeautifySpec.Default with { Background = new Background.Auto() };
+        await pipeline.CaptureFullScreenAsync(auto);
+
+        await pipeline.RerenderAsync(auto);
+        var first = Assert.IsType<Background.LinearGradient>(renderer.LastSpec!.Background);
+        await pipeline.RerenderAsync(auto);
+        var second = Assert.IsType<Background.LinearGradient>(renderer.LastSpec!.Background);
+
+        // The per-capture salt is held for the capture's lifetime, so re-renders don't reshuffle it.
+        Assert.Equal(first, second);
+    }
+
     private static CapturedImage SolidImage(int width, int height)
     {
         byte[] bgra = new byte[width * height * 4];
@@ -164,6 +218,27 @@ public class CapturePipelineTests
             LastSource = source;
             LastSpec = spec;
             return Task.FromResult(Result<CapturedImage>.Ok(source));
+        }
+    }
+
+    private sealed class FailingRenderer : IBeautifyRenderer
+    {
+        public Task<Result<CapturedImage>> RenderAsync(CapturedImage source, BeautifySpec spec, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Result<CapturedImage>.Fail(ErrorCodes.BeautifyRender, "render boom"));
+    }
+
+    private sealed class CancellationAwareCapture : IScreenCaptureService
+    {
+        public Task<Result<CapturedImage>> CaptureRegionAsync(PhysicalRect region, CancellationToken cancellationToken = default) => Grab(cancellationToken);
+
+        public Task<Result<CapturedImage>> CaptureMonitorAsync(int monitorIndex, CancellationToken cancellationToken = default) => Grab(cancellationToken);
+
+        public Task<Result<CapturedImage>> CaptureWindowAsync(nint windowHandle, CancellationToken cancellationToken = default) => Grab(cancellationToken);
+
+        private static Task<Result<CapturedImage>> Grab(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(Result<CapturedImage>.Ok(new CapturedImage(new PhysicalSize(8, 8), new byte[8 * 8 * 4], Dpi.Default)));
         }
     }
 }

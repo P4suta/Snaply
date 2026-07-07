@@ -7,7 +7,8 @@ branch protection.
 
 | File | Target | Enforces |
 |---|---|---|
-| `protect-default-branch.json` | `refs/heads/main` | PR required, `ci-required` + `analyze` status checks (strict), linear history, conversation resolution, no force-push, no deletion |
+| `protect-default-branch.json` | `refs/heads/main` | PR required (squash-only merge), `ci-required` + `analyze` + `analyze-actions` status checks (strict), linear history, conversation resolution, no force-push, no deletion |
+| `protect-release-tags.json` | `refs/tags/v*` | release tags are immutable — no deletion, no force-update (creation is allowed, so release-please can still tag) |
 | `require-signed-commits.json` | all branches except `gh-pages` | signed commits |
 
 > **Application is opt-in and manual.** GitHub does not auto-apply rulesets
@@ -26,7 +27,17 @@ Apply a ruleset with `gh`:
 gh api -X POST repos/P4suta/Snaply/rulesets \
   --input .github/rulesets/protect-default-branch.json
 gh api -X POST repos/P4suta/Snaply/rulesets \
+  --input .github/rulesets/protect-release-tags.json
+gh api -X POST repos/P4suta/Snaply/rulesets \
   --input .github/rulesets/require-signed-commits.json
+```
+
+To **update** an existing ruleset in place (keeping its id), `PUT` to its id
+instead of `POST`:
+
+```sh
+gh api -X PUT repos/P4suta/Snaply/rulesets/<id> \
+  --input .github/rulesets/protect-default-branch.json
 ```
 
 Re-export after a settings change (strips volatile fields), so the tree stays
