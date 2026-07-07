@@ -68,18 +68,6 @@
   <data name="CaptureWindowLabel.Text" xml:space="preserve">
     <value>ウィンドウをキャプチャ</value>
   </data>
-  <data name="SavePngLabel.Text" xml:space="preserve">
-    <value>PNGで保存</value>
-  </data>
-  <data name="CopyLabel.Text" xml:space="preserve">
-    <value>コピー</value>
-  </data>
-  <data name="CmdSettings.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>設定</value>
-  </data>
-  <data name="CmdSettings.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
-    <value>設定</value>
-  </data>
   <!-- ===== 統合キャプチャボタン (SplitButton primary ラベル + ヒーローヒント) ===== -->
   <data name="CaptureModeRegion" xml:space="preserve">
     <value>領域をキャプチャ</value>
@@ -90,22 +78,6 @@
   <data name="CaptureModeWindow" xml:space="preserve">
     <value>ウィンドウをキャプチャ</value>
   </data>
-  <data name="CaptureHint.Text" xml:space="preserve">
-    <value>全画面・領域・ウィンドウから選んでキャプチャ</value>
-  </data>
-  <!-- ===== テーマ選択 (設定 &gt; 全般) ===== -->
-  <data name="CardTheme.Header" xml:space="preserve">
-    <value>テーマ</value>
-  </data>
-  <data name="ThemeSystem.Content" xml:space="preserve">
-    <value>システム</value>
-  </data>
-  <data name="ThemeLight.Content" xml:space="preserve">
-    <value>ライト</value>
-  </data>
-  <data name="ThemeDark.Content" xml:space="preserve">
-    <value>ダーク</value>
-  </data>
   <!-- ===== キャプチャオーバーレイ (RegionOverlayWindow.xaml / WindowPickerOverlay.xaml) ===== -->
   <data name="RegionHint.Text" xml:space="preserve">
     <value>ドラッグで範囲を選択  ·  Esc でキャンセル</value>
@@ -113,178 +85,12 @@
   <data name="WindowPickerHint.Text" xml:space="preserve">
     <value>ウィンドウをクリックしてキャプチャ  ·  Esc でキャンセル</value>
   </data>
-  <!-- ===== 設定ダイアログ (SettingsDialog.xaml) ===== -->
-  <data name="CardBackground.Header" xml:space="preserve">
-    <value>背景</value>
-  </data>
-  <data name="CardBackground.Description" xml:space="preserve">
-    <value>キャプチャの背後を塗りつぶします</value>
-  </data>
-  <data name="CardShadow.Header" xml:space="preserve">
-    <value>ドロップシャドウ</value>
-  </data>
-  <data name="CardShadow.Description" xml:space="preserve">
-    <value>キャプチャの下にやわらかい影を落とします</value>
-  </data>
-  <data name="CardAspect.Header" xml:space="preserve">
-    <value>アスペクト比</value>
-  </data>
-  <data name="SegAspect.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>アスペクト比</value>
-  </data>
-  <data name="AspectAuto.Content" xml:space="preserve">
-    <value>自動</value>
-  </data>
-  <data name="AspectSquare.Content" xml:space="preserve">
-    <value>正方形</value>
-  </data>
-  <data name="AspectFourThree.Content" xml:space="preserve">
-    <value>4:3</value>
-  </data>
-  <data name="AspectSixteenNine.Content" xml:space="preserve">
-    <value>16:9</value>
-  </data>
-  <data name="SectionCapture.Text" xml:space="preserve">
-    <value>キャプチャ</value>
-  </data>
-  <data name="CardHide.Header" xml:space="preserve">
-    <value>キャプチャ中は非表示</value>
-  </data>
-  <data name="CardHide.Description" xml:space="preserve">
-    <value>キャプチャ中に Snaply のウィンドウを隠して写り込みを防ぎます</value>
-  </data>
-  <data name="SectionGeneral.Text" xml:space="preserve">
-    <value>全般</value>
-  </data>
-  <data name="CardLanguage.Header" xml:space="preserve">
-    <value>言語</value>
-  </data>
-  <data name="CardLanguage.Description" xml:space="preserve">
-    <value>表示言語を選択します</value>
-  </data>
   <!-- ===== ズーム操作 (ZoomableImage.xaml) ===== -->
   <data name="PreviewImageA11y.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>整形されたスクリーンショットのプレビュー</value>
   </data>
-  <data name="ZoomFit.Content" xml:space="preserve">
-    <value>全体表示</value>
-  </data>
-  <data name="ZoomFit.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>画像を画面に合わせる</value>
-  </data>
-  <data name="ZoomHundred.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>実寸大で表示</value>
-  </data>
-  <!-- ===== ステータスメッセージ (MainViewModel via IUiStrings) ===== -->
-  <data name="StatusReady" xml:space="preserve">
-    <value>準備完了。全画面または範囲をキャプチャして始めましょう。</value>
-  </data>
-  <data name="StatusCapturingFullScreen" xml:space="preserve">
-    <value>全画面をキャプチャ中…</value>
-  </data>
-  <data name="StatusRegionUnavailable" xml:space="preserve">
-    <value>範囲キャプチャは利用できません。</value>
-  </data>
-  <data name="StatusSelectRegion" xml:space="preserve">
-    <value>範囲を選択…</value>
-  </data>
-  <data name="StatusRegionCancelled" xml:space="preserve">
-    <value>範囲キャプチャをキャンセルしました。</value>
-  </data>
-  <data name="StatusCapturingRegion" xml:space="preserve">
-    <value>範囲をキャプチャ中…</value>
-  </data>
-  <data name="StatusWindowUnavailable" xml:space="preserve">
-    <value>ウィンドウキャプチャは利用できません。</value>
-  </data>
-  <data name="StatusSelectWindow" xml:space="preserve">
-    <value>ウィンドウを選択…</value>
-  </data>
-  <data name="StatusWindowCancelled" xml:space="preserve">
-    <value>ウィンドウキャプチャをキャンセルしました。</value>
-  </data>
-  <data name="StatusCapturingWindow" xml:space="preserve">
-    <value>ウィンドウをキャプチャ中…</value>
-  </data>
-  <data name="StatusSaveCancelled" xml:space="preserve">
-    <value>保存をキャンセルしました。</value>
-  </data>
-  <data name="StatusSavedFormat" xml:space="preserve">
-    <value>{0} に保存しました</value>
-  </data>
-  <data name="StatusSaveFailedFormat" xml:space="preserve">
-    <value>保存に失敗しました: {0}</value>
-  </data>
-  <data name="StatusCopied" xml:space="preserve">
-    <value>クリップボードにコピーしました。</value>
-  </data>
-  <data name="StatusCopyFailedFormat" xml:space="preserve">
-    <value>コピーに失敗しました: {0}</value>
-  </data>
-  <data name="StatusDimensionsFormat" xml:space="preserve">
-    <value>{0} × {1} px</value>
-  </data>
-  <data name="StatusErrorFormat" xml:space="preserve">
-    <value>エラー: {0}</value>
-  </data>
-  <!-- ===== 背景プリセット名 (MainViewModel) ===== -->
-  <data name="BackgroundAuto" xml:space="preserve">
-    <value>自動</value>
-  </data>
-  <data name="BackgroundNone" xml:space="preserve">
-    <value>なし（透明）</value>
-  </data>
-  <data name="BackgroundIndigoViolet" xml:space="preserve">
-    <value>インディゴ → バイオレット</value>
-  </data>
-  <data name="BackgroundOcean" xml:space="preserve">
-    <value>オーシャン</value>
-  </data>
-  <data name="BackgroundSunset" xml:space="preserve">
-    <value>サンセット</value>
-  </data>
-  <data name="BackgroundWhite" xml:space="preserve">
-    <value>ホワイト（単色）</value>
-  </data>
-  <data name="BackgroundCharcoal" xml:space="preserve">
-    <value>チャコール（単色）</value>
-  </data>
-  <!-- ===== トレイメニュー (App.xaml.cs -> TrayService) ===== -->
-  <data name="TrayCaptureRegion" xml:space="preserve">
-    <value>範囲をキャプチャ</value>
-  </data>
-  <data name="TrayCaptureFullScreen" xml:space="preserve">
-    <value>全画面をキャプチャ</value>
-  </data>
-  <data name="TrayExit" xml:space="preserve">
-    <value>終了</value>
-  </data>
   <!-- ===== 保存ダイアログ (MainPage.xaml.cs) ===== -->
-  <data name="SaveFileTypePng" xml:space="preserve">
-    <value>PNG 画像</value>
-  </data>
-  <!-- ===== 設定ダイアログの枠 + 言語切替 (コードビハインド) ===== -->
-  <data name="SettingsTitle" xml:space="preserve">
-    <value>設定</value>
-  </data>
-  <data name="SettingsCloseButton" xml:space="preserve">
-    <value>完了</value>
-  </data>
-  <data name="LanguageSystemDefault" xml:space="preserve">
-    <value>システム設定に従う</value>
-  </data>
-  <data name="RestartDialogTitle" xml:space="preserve">
-    <value>再起動が必要です</value>
-  </data>
-  <data name="RestartDialogBody" xml:space="preserve">
-    <value>表示言語を変更するには Snaply を再起動します。</value>
-  </data>
-  <data name="RestartNowButton" xml:space="preserve">
-    <value>今すぐ再起動</value>
-  </data>
-  <data name="RestartLaterButton" xml:space="preserve">
-    <value>後で</value>
-  </data>
+  <!-- ===== エクスポートボタンのラベル (MainViewModel) ===== -->
   <!-- ===== エラー可視化 (ErrorPresenter / InfoBar) ===== -->
   <data name="Error_capture_monitor" xml:space="preserve">
     <value>画面をキャプチャできませんでした。</value>
@@ -325,9 +131,6 @@
   <data name="ErrorCopyButton.Content" xml:space="preserve">
     <value>コピー</value>
   </data>
-  <data name="StatusHotkeyUnavailable" xml:space="preserve">
-    <value>ショートカット {0} は使用中で登録できませんでした。</value>
-  </data>
   <!-- ===== クラッシュダイアログ (CrashHandler / App) ===== -->
   <data name="CrashTitle" xml:space="preserve">
     <value>問題が発生しました</value>
@@ -344,39 +147,10 @@
   <data name="CrashClose" xml:space="preserve">
     <value>閉じる</value>
   </data>
-  <!-- ===== 診断パネル (SettingsDialog) ===== -->
-  <data name="CardLogs.Header" xml:space="preserve">
-    <value>ログとクラッシュレポート</value>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>保存先フォルダーを開く</value>
   </data>
-  <data name="CardLogs.Description" xml:space="preserve">
-    <value>ログとクラッシュレポートの保存フォルダを開きます</value>
-  </data>
-  <data name="OpenLogsButton.Content" xml:space="preserve">
-    <value>ログフォルダを開く</value>
-  </data>
-  <data name="CopyDiagnosticsButton.Content" xml:space="preserve">
-    <value>診断情報をコピー</value>
-  </data>
-  <data name="CardVerboseLogging.Header" xml:space="preserve">
-    <value>詳細ログ</value>
-  </data>
-  <data name="CardVerboseLogging.Description" xml:space="preserve">
-    <value>問題調査のために詳細な情報を記録します</value>
-  </data>
-  <!-- ===== 再構築した設定: ビューティ群 + エクスポートボタン + 診断エキスパンダー ===== -->
-  <data name="SectionBeautify.Text" xml:space="preserve">
-    <value>ビューティ</value>
-  </data>
-  <data name="ExportSave" xml:space="preserve">
-    <value>PNGで保存</value>
-  </data>
-  <data name="ExportCopy" xml:space="preserve">
-    <value>コピー</value>
-  </data>
-  <data name="ExpanderDiagnostics.Header" xml:space="preserve">
-    <value>診断</value>
-  </data>
-  <data name="ExpanderDiagnostics.Description" xml:space="preserve">
-    <value>ログ・クラッシュレポート・アプリ情報</value>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>保存先フォルダーを開く</value>
   </data>
 </root>

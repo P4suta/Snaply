@@ -97,6 +97,17 @@ public readonly record struct PhysicalRect(int X, int Y, int Width, int Height)
     public bool Contains(int x, int y) => x >= X && x < Right && y >= Y && y < Bottom;
 
     /// <summary>
+    /// This rectangle re-expressed relative to <paramref name="origin"/>'s top-left
+    /// (translated by -origin.X, -origin.Y). Turns a screen-space frame rect into an
+    /// offset inside a window-local captured bitmap — e.g. the visible frame within a
+    /// window-rect-sized PrintWindow bitmap.
+    /// </summary>
+    /// <param name="origin">The rectangle whose top-left becomes the new origin.</param>
+    /// <returns>This rectangle shifted so <paramref name="origin"/>'s top-left is (0, 0).</returns>
+    public PhysicalRect RelativeTo(PhysicalRect origin) =>
+        this with { X = X - origin.X, Y = Y - origin.Y };
+
+    /// <summary>
     /// The bounding rectangle of a sequence of rectangles (empty ones ignored), or an empty
     /// rectangle when the sequence yields nothing with area.
     /// </summary>

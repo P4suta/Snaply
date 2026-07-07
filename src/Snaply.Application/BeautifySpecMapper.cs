@@ -8,7 +8,6 @@ namespace Snaply.Application;
 /// The raw, string-valued beautify options as they arrive from a CLI flag or an MCP tool
 /// argument, before validation. A null field means "not specified — keep the default".
 /// </summary>
-/// <param name="NoBeautify">When true, skip beautify entirely and keep the raw capture.</param>
 /// <param name="Background">
 /// <c>auto</c> | <c>solid:#RRGGBB[AA]</c> | <c>gradient:#RRGGBB,#RRGGBB@135</c> | <c>image:&lt;path&gt;</c>.
 /// </param>
@@ -17,7 +16,6 @@ namespace Snaply.Application;
 /// <param name="Shadow"><c>none</c> | <c>default</c> | <c>offX,offY,blur,opacity[,#RRGGBB]</c>.</param>
 /// <param name="Aspect"><c>auto</c> | <c>square</c> | <c>standard</c> | <c>wide</c> (case-insensitive).</param>
 public sealed record BeautifyOptions(
-    bool NoBeautify = false,
     string? Background = null,
     string? Padding = null,
     double? CornerRadius = null,
@@ -34,20 +32,14 @@ public sealed record BeautifyOptions(
 public static class BeautifySpecMapper
 {
     /// <summary>
-    /// Resolves <paramref name="options"/> into a beautify spec. Returns a success carrying
-    /// <c>null</c> when <see cref="BeautifyOptions.NoBeautify"/> is set (the caller should then
-    /// keep the raw capture); otherwise a success carrying the resolved spec, or a failure.
+    /// Resolves <paramref name="options"/> into a beautify spec. Every unspecified option keeps its
+    /// <see cref="BeautifySpec.Default"/> value; a parse error becomes a validation failure.
     /// </summary>
     /// <param name="options">The raw beautify options to validate and map.</param>
-    /// <returns>The resolved spec (or null for no-beautify), or a validation failure.</returns>
-    public static Result<BeautifySpec?> Map(BeautifyOptions options)
+    /// <returns>The resolved spec, or a validation failure.</returns>
+    public static Result<BeautifySpec> Map(BeautifyOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-
-        if (options.NoBeautify)
-        {
-            return Result<BeautifySpec?>.Ok(null);
-        }
 
         BeautifySpec spec = BeautifySpec.Default;
 
@@ -56,7 +48,7 @@ public static class BeautifySpecMapper
             Result<Background> background = ParseBackground(options.Background);
             if (background.IsFailure)
             {
-                return Result<BeautifySpec?>.Fail(background.Error);
+                return Result<BeautifySpec>.Fail(background.Error);
             }
 
             spec = spec with { Background = background.Value };
@@ -67,7 +59,7 @@ public static class BeautifySpecMapper
             Result<Padding> padding = ParsePadding(options.Padding);
             if (padding.IsFailure)
             {
-                return Result<BeautifySpec?>.Fail(padding.Error);
+                return Result<BeautifySpec>.Fail(padding.Error);
             }
 
             // An explicit padding must survive the pipeline's auto-derivation.
@@ -89,7 +81,7 @@ public static class BeautifySpecMapper
             Result<ShadowSpec> shadow = ParseShadow(options.Shadow);
             if (shadow.IsFailure)
             {
-                return Result<BeautifySpec?>.Fail(shadow.Error);
+                return Result<BeautifySpec>.Fail(shadow.Error);
             }
 
             spec = spec with { Shadow = shadow.Value };
@@ -105,7 +97,7 @@ public static class BeautifySpecMapper
             spec = spec with { Aspect = aspect };
         }
 
-        return Result<BeautifySpec?>.Ok(spec);
+        return Result<BeautifySpec>.Ok(spec);
     }
 
     private static Result<Background> ParseBackground(string value)
@@ -309,6 +301,6 @@ public static class BeautifySpecMapper
     private static Result<T> FailFor<T>(string message) =>
         Result<T>.Fail(ErrorCodes.InputInvalid, message);
 
-    private static Result<BeautifySpec?> Fail(string message) =>
-        Result<BeautifySpec?>.Fail(ErrorCodes.InputInvalid, message);
+    private static Result<BeautifySpec> Fail(string message) =>
+        Result<BeautifySpec>.Fail(ErrorCodes.InputInvalid, message);
 }

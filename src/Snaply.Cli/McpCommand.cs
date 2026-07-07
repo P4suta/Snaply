@@ -61,26 +61,23 @@ internal static class McpCommand
 
     private static async Task<int> ServeStdioAsync(CapturePolicy policy, CancellationToken ct)
     {
-        var settingsStore = new SettingsStore();
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
 
         // stdout is the MCP protocol channel — never let a console logger write to it.
         builder.Logging.ClearProviders();
-        AddSnaplyServices(builder.Services, settingsStore, policy);
+        AddSnaplyServices(builder.Services, policy);
         builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<SnaplyMcpTools>();
 
         IHost host = builder.Build();
-        settingsStore.Logger = host.Services.GetRequiredService<ILogger<SettingsStore>>();
         await host.RunAsync(ct).ConfigureAwait(true);
         return ExitCodes.Success;
     }
 
     private static async Task<int> ServeHttpAsync(CapturePolicy policy, string httpUrl, bool stateless, CancellationToken ct)
     {
-        var settingsStore = new SettingsStore();
         WebApplicationBuilder builder = WebApplication.CreateBuilder(Array.Empty<string>());
 
-        AddSnaplyServices(builder.Services, settingsStore, policy);
+        AddSnaplyServices(builder.Services, policy);
         builder.Services
             .AddMcpServer()
             .WithHttpTransport(options => options.Stateless = stateless)
@@ -88,7 +85,6 @@ internal static class McpCommand
 
         WebApplication app = builder.Build();
         app.Urls.Add(httpUrl);
-        settingsStore.Logger = app.Services.GetRequiredService<ILogger<SettingsStore>>();
 
         // DNS-rebinding / cross-origin defence: the MCP spec requires HTTP servers to validate the
         // Host (and Origin) header. Accept only the bound host + loopback, so a browser page rebound
@@ -137,10 +133,10 @@ internal static class McpCommand
             || host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
             || host is "127.0.0.1" or "::1" or "[::1]");
 
-    private static void AddSnaplyServices(IServiceCollection services, SettingsStore settingsStore, CapturePolicy policy)
+    private static void AddSnaplyServices(IServiceCollection services, CapturePolicy policy)
     {
-        services.AddSnaplyApplication(settingsStore);
-        services.AddSnaplyLogging(settingsStore, console: false);
+        services.AddSnaplyApplication();
+        services.AddSnaplyLogging(console: false);
         services.AddSnaplyPlatform();
         services.AddSingleton(policy);
     }

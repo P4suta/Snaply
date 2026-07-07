@@ -11,145 +11,141 @@
     mc:Ignorable="d">
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <!--  ===== Row 0: canvas — preview with a persistent floating command bar ===== -->
+        <!--  Canvas: the preview card with a persistent floating command bar.  -->
         <Border
-            Grid.Row="0"
             Margin="{StaticResource ContentPadding}"
             Style="{StaticResource PreviewSurfaceStyle}">
             <Grid>
+                <Grid.Resources>
+                    <!--  "Saved" feedback: the folder icon briefly flips to a green check that pops in,
+                          holds, then flips back. Played by the code-behind on each successful auto-save.  -->
+                    <Storyboard x:Name="SavedFeedback">
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="FolderGlyph" Storyboard.TargetProperty="Opacity">
+                            <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1" />
+                            <LinearDoubleKeyFrame KeyTime="0:0:0.1" Value="0" />
+                            <LinearDoubleKeyFrame KeyTime="0:0:0.9" Value="0" />
+                            <LinearDoubleKeyFrame KeyTime="0:0:1.05" Value="1" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SavedCheck" Storyboard.TargetProperty="Opacity">
+                            <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0" />
+                            <LinearDoubleKeyFrame KeyTime="0:0:0.1" Value="1" />
+                            <LinearDoubleKeyFrame KeyTime="0:0:0.9" Value="1" />
+                            <LinearDoubleKeyFrame KeyTime="0:0:1.05" Value="0" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SavedCheckScale" Storyboard.TargetProperty="ScaleX">
+                            <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0.6" />
+                            <SplineDoubleKeyFrame KeyTime="0:0:0.28" Value="1.2" KeySpline="0.1,0.9,0.2,1" />
+                            <SplineDoubleKeyFrame KeyTime="0:0:0.44" Value="1" KeySpline="0.2,0,0,1" />
+                        </DoubleAnimationUsingKeyFrames>
+                        <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SavedCheckScale" Storyboard.TargetProperty="ScaleY">
+                            <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0.6" />
+                            <SplineDoubleKeyFrame KeyTime="0:0:0.28" Value="1.2" KeySpline="0.1,0.9,0.2,1" />
+                            <SplineDoubleKeyFrame KeyTime="0:0:0.44" Value="1" KeySpline="0.2,0,0,1" />
+                        </DoubleAnimationUsingKeyFrames>
+                    </Storyboard>
+                </Grid.Resources>
+
+                <!--  Ambient backdrop: a soft field of freely, gently shifting colour that fills the
+                      WHOLE card — always on, so the captured image floats over a living background.
+                      It calms (lower saturation, slower colour drift) while an image is shown.  -->
+                <ctrl:AmbientBackdrop
+                    x:Name="AmbientBackdrop"
+                    IsActive="True"
+                    IsMuted="{x:Bind ViewModel.HasImage, Mode=OneWay}" />
+
+                <!--  The captured image shares the ambient's exact region (fills the whole card) so
+                      zoom/pan crops at the card edge, never at an inset. It still reads as floating:
+                      it's lifted with a drop shadow and the ambient shows through around it.  -->
                 <ctrl:ZoomableImage x:Name="PreviewImageControl" />
 
-                <!--  Empty state: a quiet hint, not a big dead label (the command bar hosts the action).  -->
-                <StackPanel
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Spacing="{StaticResource EmptyStateSpacing}"
-                    Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.HasNoImage), Mode=OneWay}">
-                    <FontIcon
-                        HorizontalAlignment="Center"
-                        FontSize="{StaticResource IconSizeXLarge}"
-                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                        Glyph="&#xE722;" />
-                    <TextBlock
-                        x:Uid="CaptureHint"
-                        HorizontalAlignment="Center"
-                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                        Style="{StaticResource CaptionTextBlockStyle}" />
-                </StackPanel>
+                <!--  Only the floating UI (pills, error banner, progress) is inset from the card edge.  -->
+                <Grid Padding="{StaticResource PreviewSurfacePadding}">
 
-                <!--  Persistent command bar: Capture (always) + Save/Copy (with an image) on the
-                      left; Settings on the right. Floats over the top of the preview.  -->
+                <!--  Command pill, top-left: re-capture from here. Persistent so the shell is identical
+                      before and after the first capture (the empty canvas is the ambient backdrop).  -->
                 <Border
                     x:Name="CommandBar"
                     Margin="{StaticResource FloatingToolbarMargin}"
+                    HorizontalAlignment="Left"
                     VerticalAlignment="Top"
                     Style="{StaticResource FloatingToolbarStyle}">
-                    <Grid ColumnSpacing="{StaticResource SpacingSmall}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel
-                            Grid.Column="0"
-                            Orientation="Horizontal"
-                            Spacing="{StaticResource SpacingSmall}">
-                            <SplitButton
-                                x:Name="PrimaryCaptureButton"
-                                AutomationProperties.AutomationId="PrimaryCaptureButton"
-                                Command="{x:Bind ViewModel.PrimaryCaptureCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
-                                    <FontIcon FontSize="{StaticResource IconSizeSmall}" Glyph="{x:Bind ViewModel.PrimaryCaptureGlyph, Mode=OneWay}" />
-                                    <TextBlock Text="{x:Bind ViewModel.PrimaryCaptureLabel, Mode=OneWay}" />
-                                </StackPanel>
-                                <SplitButton.Flyout>
-                                    <MenuFlyout Placement="Bottom">
-                                        <MenuFlyoutItem
-                                            x:Uid="CaptureFullScreenLabel"
-                                            AutomationProperties.AutomationId="CaptureFullScreenItem"
-                                            Command="{x:Bind ViewModel.SelectCaptureFullScreenCommand}">
-                                            <MenuFlyoutItem.Icon>
-                                                <FontIcon Glyph="&#xE7B7;" />
-                                            </MenuFlyoutItem.Icon>
-                                        </MenuFlyoutItem>
-                                        <MenuFlyoutItem
-                                            x:Uid="CaptureRegionLabel"
-                                            AutomationProperties.AutomationId="CaptureRegionItem"
-                                            Command="{x:Bind ViewModel.SelectCaptureRegionCommand}">
-                                            <MenuFlyoutItem.Icon>
-                                                <FontIcon Glyph="&#xEF20;" />
-                                            </MenuFlyoutItem.Icon>
-                                        </MenuFlyoutItem>
-                                        <MenuFlyoutItem
-                                            x:Uid="CaptureWindowLabel"
-                                            AutomationProperties.AutomationId="CaptureWindowItem"
-                                            Command="{x:Bind ViewModel.SelectCaptureWindowCommand}">
-                                            <MenuFlyoutItem.Icon>
-                                                <FontIcon Glyph="&#xE737;" />
-                                            </MenuFlyoutItem.Icon>
-                                        </MenuFlyoutItem>
-                                    </MenuFlyout>
-                                </SplitButton.Flyout>
-                            </SplitButton>
-
-                            <SplitButton
-                                x:Name="PrimaryExportButton"
-                                AutomationProperties.AutomationId="PrimaryExportButton"
-                                Command="{x:Bind ViewModel.PrimaryExportCommand}"
-                                Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.HasImage), Mode=OneWay}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
-                                    <FontIcon FontSize="{StaticResource IconSizeSmall}" Glyph="{x:Bind ViewModel.PrimaryExportGlyph, Mode=OneWay}" />
-                                    <TextBlock Text="{x:Bind ViewModel.PrimaryExportLabel, Mode=OneWay}" />
-                                </StackPanel>
-                                <SplitButton.Flyout>
-                                    <MenuFlyout Placement="Bottom">
-                                        <MenuFlyoutItem
-                                            x:Uid="SavePngLabel"
-                                            AutomationProperties.AutomationId="SaveItem"
-                                            Command="{x:Bind ViewModel.SelectExportSaveCommand}">
-                                            <MenuFlyoutItem.Icon>
-                                                <FontIcon Glyph="&#xE74E;" />
-                                            </MenuFlyoutItem.Icon>
-                                        </MenuFlyoutItem>
-                                        <MenuFlyoutItem
-                                            x:Uid="CopyLabel"
-                                            AutomationProperties.AutomationId="CopyItem"
-                                            Command="{x:Bind ViewModel.SelectExportCopyCommand}">
-                                            <MenuFlyoutItem.Icon>
-                                                <FontIcon Glyph="&#xE8C8;" />
-                                            </MenuFlyoutItem.Icon>
-                                        </MenuFlyoutItem>
-                                    </MenuFlyout>
-                                </SplitButton.Flyout>
-                            </SplitButton>
+                    <SplitButton
+                        x:Name="PrimaryCaptureButton"
+                        AutomationProperties.AutomationId="PrimaryCaptureButton"
+                        Command="{x:Bind ViewModel.PrimaryCaptureCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
+                            <FontIcon FontSize="{StaticResource IconSizeSmall}" Glyph="{x:Bind ViewModel.PrimaryCaptureGlyph, Mode=OneWay}" />
+                            <TextBlock Text="{x:Bind ViewModel.PrimaryCaptureLabel, Mode=OneWay}" />
                         </StackPanel>
-
-                        <Button
-                            x:Name="SettingsButton"
-                            x:Uid="CmdSettings"
-                            Grid.Column="2"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Click="OnSettingsClick">
-                            <FontIcon FontSize="{StaticResource IconSizeSmall}" Glyph="&#xE713;" />
-                        </Button>
-                    </Grid>
+                        <SplitButton.Flyout>
+                            <MenuFlyout Placement="Bottom">
+                                <MenuFlyoutItem
+                                    x:Uid="CaptureFullScreenLabel"
+                                    AutomationProperties.AutomationId="CaptureFullScreenItem"
+                                    Command="{x:Bind ViewModel.SelectCaptureFullScreenCommand}">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE7B7;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem
+                                    x:Uid="CaptureRegionLabel"
+                                    AutomationProperties.AutomationId="CaptureRegionItem"
+                                    Command="{x:Bind ViewModel.SelectCaptureRegionCommand}">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xEF20;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                                <MenuFlyoutItem
+                                    x:Uid="CaptureWindowLabel"
+                                    AutomationProperties.AutomationId="CaptureWindowItem"
+                                    Command="{x:Bind ViewModel.SelectCaptureWindowCommand}">
+                                    <MenuFlyoutItem.Icon>
+                                        <FontIcon Glyph="&#xE737;" />
+                                    </MenuFlyoutItem.Icon>
+                                </MenuFlyoutItem>
+                            </MenuFlyout>
+                        </SplitButton.Flyout>
+                    </SplitButton>
                 </Border>
 
-                <ProgressRing
-                    Width="{StaticResource ProgressRingSize}"
-                    Height="{StaticResource ProgressRingSize}"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                <!--  Open-folder pill, top-right (mirrors the Capture pill). Opens the captures folder;
+                      on every auto-save its folder icon briefly flips to a green check — that animation
+                      IS the "saved" feedback (no toast).  -->
+                <Border
+                    x:Name="OpenFolderBar"
+                    Margin="{StaticResource FloatingToolbarMargin}"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Style="{StaticResource FloatingToolbarStyle}">
+                    <Button
+                        x:Name="OpenFolderButton"
+                        x:Uid="OpenFolderButton"
+                        Padding="{StaticResource IconButtonPadding}"
+                        AutomationProperties.AutomationId="OpenFolderButton"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Click="OnOpenFolderClick">
+                        <Grid>
+                            <FontIcon
+                                x:Name="FolderGlyph"
+                                FontSize="{StaticResource IconSizeSmall}"
+                                Glyph="&#xE8B7;" />
+                            <FontIcon
+                                x:Name="SavedCheck"
+                                FontSize="{StaticResource IconSizeSmall}"
+                                Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                Glyph="&#xE73E;"
+                                Opacity="0"
+                                RenderTransformOrigin="0.5,0.5">
+                                <FontIcon.RenderTransform>
+                                    <ScaleTransform x:Name="SavedCheckScale" ScaleX="0.6" ScaleY="0.6" />
+                                </FontIcon.RenderTransform>
+                            </FontIcon>
+                        </Grid>
+                    </Button>
+                </Border>
 
-                <!--  Prominent, dismissible error surface. Friendly title up top; raw technical
+                <!--  Prominent, dismissible error surface (bottom). Friendly title up top; raw technical
                       detail (code + exception) tucked into the details expander with a copy button.  -->
                 <InfoBar
                     x:Name="ErrorInfoBar"
@@ -180,47 +176,15 @@
                         </Expander>
                     </InfoBar.Content>
                 </InfoBar>
+
+                <ProgressRing
+                    Width="{StaticResource ProgressRingSize}"
+                    Height="{StaticResource ProgressRingSize}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                </Grid>
             </Grid>
         </Border>
-
-        <!--  ===== Row 1: slim status bar ===== -->
-        <Grid
-            Grid.Row="1"
-            Padding="{StaticResource StatusBarPadding}"
-            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-            BorderThickness="{StaticResource StatusBarBorderThickness}"
-            ColumnSpacing="{StaticResource SpacingMedium}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <TextBlock
-                x:Name="StatusText"
-                Grid.Column="0"
-                VerticalAlignment="Center"
-                AutomationProperties.AutomationId="StatusText"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                TextTrimming="CharacterEllipsis" />
-
-            <StackPanel
-                Grid.Column="1"
-                Orientation="Horizontal"
-                Spacing="{StaticResource SpacingSmall}"
-                Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.HasImage), Mode=OneWay}">
-                <FontIcon
-                    FontSize="{StaticResource IconSizeXSmall}"
-                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                    Glyph="&#xE9A9;" />
-                <TextBlock
-                    x:Name="DimensionsText"
-                    VerticalAlignment="Center"
-                    AutomationProperties.AutomationId="DimensionsText"
-                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                    Style="{StaticResource CaptionTextBlockStyle}" />
-            </StackPanel>
-        </Grid>
     </Grid>
 </Page>

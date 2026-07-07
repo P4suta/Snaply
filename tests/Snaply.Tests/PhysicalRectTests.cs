@@ -127,4 +127,38 @@ public class PhysicalRectTests
     {
         Assert.Throws<ArgumentNullException>(() => PhysicalRect.Bounds(null!));
     }
+
+    [Fact]
+    public void RelativeTo_TranslatesOriginToZero_KeepingExtent()
+    {
+        // A visible frame inside a window rect (7px invisible border left/right/bottom, flush top)
+        // becomes a window-local offset once re-based to the window's top-left — the crop origin a
+        // PrintWindow grab uses to trim the invisible border.
+        var windowRect = new PhysicalRect(228, 228, 1397, 987);
+        var frame = new PhysicalRect(235, 228, 1383, 980);
+
+        Assert.Equal(new PhysicalRect(7, 0, 1383, 980), frame.RelativeTo(windowRect));
+    }
+
+    [Fact]
+    public void RelativeTo_SameRect_IsAtOrigin()
+    {
+        var rect = new PhysicalRect(-400, 250, 800, 600); // a window on a monitor left of primary
+
+        Assert.Equal(new PhysicalRect(0, 0, 800, 600), rect.RelativeTo(rect));
+    }
+
+    [Fact]
+    public void VisibleFrameCrop_RebasesFrameAndClampsToBitmap()
+    {
+        // Mirrors WindowPrinter.VisibleFrameCrop: the PrintWindow bitmap spans the window rect, so
+        // re-basing the DWM frame and clamping to the bitmap yields the visible crop.
+        var windowRect = new PhysicalRect(228, 228, 1397, 987);
+        var frame = new PhysicalRect(235, 228, 1383, 980);
+        var bitmap = new PhysicalRect(0, 0, 1397, 987);
+
+        PhysicalRect crop = frame.RelativeTo(windowRect).Intersect(bitmap);
+
+        Assert.Equal(new PhysicalRect(7, 0, 1383, 980), crop);
+    }
 }

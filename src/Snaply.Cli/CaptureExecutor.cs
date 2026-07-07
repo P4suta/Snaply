@@ -46,7 +46,7 @@ internal static class CaptureExecutor
     /// <param name="output">The output context (human/JSON rendering).</param>
     /// <param name="command">The dotted command name (e.g. <c>capture.region</c>).</param>
     /// <param name="target">What to capture.</param>
-    /// <param name="spec">The beautify spec, or null for a raw (un-beautified) capture.</param>
+    /// <param name="spec">The beautify spec to apply.</param>
     /// <param name="outputs">Where to send the resulting PNG.</param>
     /// <param name="delayMs">Milliseconds to wait before capturing (0 = none).</param>
     /// <param name="ct">Cancellation token.</param>
@@ -56,7 +56,7 @@ internal static class CaptureExecutor
         OutputContext output,
         string command,
         CaptureTarget target,
-        BeautifySpec? spec,
+        BeautifySpec spec,
         OutputTargets outputs,
         int delayMs,
         CancellationToken ct)
@@ -83,7 +83,7 @@ internal static class CaptureExecutor
 
         Result<CapturedImage> captured = await WithStatusAsync(
             output,
-            spec is null ? "Capturing…" : "Capturing & beautifying…",
+            "Capturing & beautifying…",
             () => CaptureAsync(provider, target, spec, ct)).ConfigureAwait(true);
 
         if (captured.IsFailure)
@@ -146,7 +146,7 @@ internal static class CaptureExecutor
             width = image.Size.Width,
             height = image.Size.Height,
             dpi = image.Dpi.Value,
-            beautified = spec is not null,
+            beautified = true,
             output = new
             {
                 path = savedPath,
@@ -157,25 +157,12 @@ internal static class CaptureExecutor
         };
 
         return await output.SuccessAsync(command, data, console =>
-            RenderSummary(console, image, spec is not null, savedPath, copied, outputs.RawStdout)).ConfigureAwait(true);
+            RenderSummary(console, image, savedPath, copied, outputs.RawStdout)).ConfigureAwait(true);
     }
 
     private static async Task<Result<CapturedImage>> CaptureAsync(
-        IServiceProvider provider, CaptureTarget target, BeautifySpec? spec, CancellationToken ct)
+        IServiceProvider provider, CaptureTarget target, BeautifySpec spec, CancellationToken ct)
     {
-        // Beautified path goes through the pipeline; a raw capture talks to the capture port directly.
-        if (spec is null)
-        {
-            var capture = provider.GetRequiredService<IScreenCaptureService>();
-            return target switch
-            {
-                CaptureTarget.Monitor m => await capture.CaptureMonitorAsync(m.Index, ct).ConfigureAwait(true),
-                CaptureTarget.Region r => await capture.CaptureRegionAsync(r.Rect, ct).ConfigureAwait(true),
-                CaptureTarget.Window w => await capture.CaptureWindowAsync(w.Handle, ct).ConfigureAwait(true),
-                _ => Result<CapturedImage>.Fail(ErrorCodes.InputInvalid, "Unknown capture target."),
-            };
-        }
-
         var pipeline = provider.GetRequiredService<CapturePipeline>();
         return target switch
         {
@@ -186,10 +173,9 @@ internal static class CaptureExecutor
         };
     }
 
-    private static void RenderSummary(IAnsiConsole console, CapturedImage image, bool beautified, string? savedPath, bool copied, bool rawStdout)
+    private static void RenderSummary(IAnsiConsole console, CapturedImage image, string? savedPath, bool copied, bool rawStdout)
     {
-        string tag = beautified ? "[green]beautified[/]" : "[grey]raw[/]";
-        console.MarkupLine($"[green]✓[/] Captured [bold]{image.Size.Width}×{image.Size.Height}[/] @ {image.Dpi.Value:0}dpi ({tag})");
+        console.MarkupLine($"[green]✓[/] Captured [bold]{image.Size.Width}×{image.Size.Height}[/] @ {image.Dpi.Value:0}dpi ([green]beautified[/])");
         if (savedPath is not null)
         {
             console.MarkupLine($"  [grey]saved[/]     {Markup.Escape(savedPath)}");

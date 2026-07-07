@@ -20,50 +20,22 @@
         PointerWheelChanged="OnPointerWheelChanged"
         SizeChanged="OnViewportSizeChanged">
 
-        <!--  Zoom/pan are driven by Composition (element Scale/Offset) for GPU-smooth motion.  -->
+        <!--  Zoom/pan are driven by Composition (element Scale/Offset) for GPU-smooth motion.
+              Centred + capped at the image's native size (set in code): a capture smaller than the
+              viewport shows at 100% instead of being upscaled, and the element wraps the content
+              tightly (no letterbox), which keeps panning symmetric on both axes.  -->
         <Image
             x:Name="DisplayImage"
             x:Uid="PreviewImageA11y"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
             AutomationProperties.AutomationId="PreviewImage"
-            Stretch="Uniform" />
-
-        <!--  Floating zoom controls, bottom-right  -->
-        <Border
-            x:Name="ZoomControlsBar"
-            Margin="{StaticResource ZoomControlsMargin}"
-            Padding="{StaticResource ZoomControlsPadding}"
-            HorizontalAlignment="Right"
-            VerticalAlignment="Bottom"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="{StaticResource SurfaceBorderThickness}"
-            CornerRadius="{StaticResource ControlCornerRadius}"
-            Visibility="Collapsed">
-            <StackPanel
-                Orientation="Horizontal"
-                Spacing="{StaticResource SpacingSmall}"
-                VerticalAlignment="Center">
-                <TextBlock
-                    x:Name="ZoomLabel"
-                    MinWidth="{StaticResource ZoomLabelMinWidth}"
-                    VerticalAlignment="Center"
-                    AutomationProperties.AutomationId="ZoomLabel"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Style="{StaticResource CaptionTextBlockStyle}"
-                    Text="100%"
-                    TextAlignment="Center" />
-                <Button
-                    x:Name="FitButton"
-                    x:Uid="ZoomFit"
-                    AutomationProperties.AutomationId="ZoomFitButton"
-                    Click="OnFitClick" />
-                <Button
-                    x:Name="HundredButton"
-                    x:Uid="ZoomHundred"
-                    AutomationProperties.AutomationId="ZoomHundredButton"
-                    Click="OnHundredClick"
-                    Content="100%" />
-            </StackPanel>
-        </Border>
+            Stretch="Uniform">
+            <!--  Lifts the image off the ambient backdrop so it reads as floating. The Z depth that
+                  drives it is written with the pan/zoom Translation in code-behind.  -->
+            <Image.Shadow>
+                <ThemeShadow />
+            </Image.Shadow>
+        </Image>
     </Grid>
 </UserControl>

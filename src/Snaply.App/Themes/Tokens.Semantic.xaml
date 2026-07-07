@@ -29,7 +29,6 @@
 
     <!--  Inline affordances  -->
     <x:Double x:Key="ProgressRingSize">48</x:Double>
-    <x:Double x:Key="EmptyStateSpacing">12</x:Double>
     <x:Double x:Key="CommandDividerHeight">24</x:Double>
     <x:Double x:Key="DividerThickness">1</x:Double>
 
@@ -43,7 +42,6 @@
     <Thickness x:Key="CommandBarPadding">16,10</Thickness>
     <Thickness x:Key="ContentPadding">16</Thickness>
     <Thickness x:Key="PreviewSurfacePadding">24</Thickness>
-    <Thickness x:Key="StatusBarPadding">16,8</Thickness>
     <Thickness x:Key="HintBubblePadding">16,10</Thickness>
 
     <!--  ===== Thickness shapes — Margin =====  -->
@@ -52,12 +50,13 @@
 
     <!--  ===== BorderThickness =====  -->
     <Thickness x:Key="SurfaceBorderThickness">1</Thickness>
-    <!--  Status bar reads as a footer: a single hairline along its top edge.  -->
-    <Thickness x:Key="StatusBarBorderThickness">0,1,0,0</Thickness>
     <!--  Command bar reads as a header: a single hairline along its bottom edge.  -->
     <Thickness x:Key="CommandBarBorderThickness">0,0,0,1</Thickness>
     <!--  Region-overlay selection stroke.  -->
     <x:Double x:Key="SelectionStrokeThickness">2</x:Double>
+
+    <!--  Square-ish padding for an icon-only button (e.g. the open-folder affordance).  -->
+    <Thickness x:Key="IconButtonPadding">8</Thickness>
 
     <!--  ===== Content-hosted action toolbar (floats over the preview top) =====  -->
     <!--  Inset from the preview surface edges so the bar floats clear of the image.  -->

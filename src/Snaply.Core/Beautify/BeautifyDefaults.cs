@@ -188,8 +188,16 @@ public static class BeautifyDefaults
     private static double SrgbToLinear(double channel) =>
         channel <= 0.04045 ? channel / 12.92 : Math.Pow((channel + 0.055) / 1.055, 2.4);
 
-    // OKLCH -> OKLab -> linear sRGB (Björn Ottosson's matrices) -> gamma-encoded sRGB bytes.
-    private static Rgba OklchToRgba(double lightness, double chroma, double hueDegrees)
+    /// <summary>
+    /// Converts an OKLCH colour (perceptually-uniform lightness / chroma / hue) to an opaque sRGB
+    /// <see cref="Rgba"/>, gamut-clamped per channel. Exposed as reusable colour science: equal steps
+    /// in OKLCH look equally spaced, so callers get smooth, perceptually-even colour ramps.
+    /// </summary>
+    /// <param name="lightness">OKLab lightness, roughly 0 (black) to 1 (white).</param>
+    /// <param name="chroma">Chroma (colourfulness); ~0 is greyscale, higher is more saturated.</param>
+    /// <param name="hueDegrees">Hue angle in degrees (0–360, wraps).</param>
+    /// <returns>The nearest in-gamut sRGB colour, fully opaque.</returns>
+    public static Rgba OklchToRgba(double lightness, double chroma, double hueDegrees)
     {
         double h = hueDegrees * Math.PI / 180.0;
         double a = chroma * Math.Cos(h);

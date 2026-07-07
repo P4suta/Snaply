@@ -68,18 +68,6 @@
   <data name="CaptureWindowLabel.Text" xml:space="preserve">
     <value>Capture window</value>
   </data>
-  <data name="SavePngLabel.Text" xml:space="preserve">
-    <value>Save PNG</value>
-  </data>
-  <data name="CopyLabel.Text" xml:space="preserve">
-    <value>Copy</value>
-  </data>
-  <data name="CmdSettings.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>Settings</value>
-  </data>
-  <data name="CmdSettings.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
-    <value>Settings</value>
-  </data>
   <!-- ===== Unified capture button (SplitButton primary label + hero hint) ===== -->
   <data name="CaptureModeRegion" xml:space="preserve">
     <value>Capture region</value>
@@ -90,22 +78,6 @@
   <data name="CaptureModeWindow" xml:space="preserve">
     <value>Capture window</value>
   </data>
-  <data name="CaptureHint.Text" xml:space="preserve">
-    <value>Choose full screen, a region, or a window to capture</value>
-  </data>
-  <!-- ===== Theme picker (Settings &gt; General) ===== -->
-  <data name="CardTheme.Header" xml:space="preserve">
-    <value>Theme</value>
-  </data>
-  <data name="ThemeSystem.Content" xml:space="preserve">
-    <value>System</value>
-  </data>
-  <data name="ThemeLight.Content" xml:space="preserve">
-    <value>Light</value>
-  </data>
-  <data name="ThemeDark.Content" xml:space="preserve">
-    <value>Dark</value>
-  </data>
   <!-- ===== Capture overlays (RegionOverlayWindow.xaml / WindowPickerOverlay.xaml) ===== -->
   <data name="RegionHint.Text" xml:space="preserve">
     <value>Drag to select a region  ·  Esc to cancel</value>
@@ -113,178 +85,12 @@
   <data name="WindowPickerHint.Text" xml:space="preserve">
     <value>Click a window to capture  ·  Esc to cancel</value>
   </data>
-  <!-- ===== Settings dialog (SettingsDialog.xaml) ===== -->
-  <data name="CardBackground.Header" xml:space="preserve">
-    <value>Background</value>
-  </data>
-  <data name="CardBackground.Description" xml:space="preserve">
-    <value>Fill behind the capture</value>
-  </data>
-  <data name="CardShadow.Header" xml:space="preserve">
-    <value>Drop shadow</value>
-  </data>
-  <data name="CardShadow.Description" xml:space="preserve">
-    <value>Cast a soft shadow under the capture</value>
-  </data>
-  <data name="CardAspect.Header" xml:space="preserve">
-    <value>Aspect ratio</value>
-  </data>
-  <data name="SegAspect.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>Aspect ratio</value>
-  </data>
-  <data name="AspectAuto.Content" xml:space="preserve">
-    <value>Auto</value>
-  </data>
-  <data name="AspectSquare.Content" xml:space="preserve">
-    <value>Square</value>
-  </data>
-  <data name="AspectFourThree.Content" xml:space="preserve">
-    <value>4:3</value>
-  </data>
-  <data name="AspectSixteenNine.Content" xml:space="preserve">
-    <value>16:9</value>
-  </data>
-  <data name="SectionCapture.Text" xml:space="preserve">
-    <value>Capture</value>
-  </data>
-  <data name="CardHide.Header" xml:space="preserve">
-    <value>Hide while capturing</value>
-  </data>
-  <data name="CardHide.Description" xml:space="preserve">
-    <value>Hide the Snaply window during a capture so it isn't in the shot</value>
-  </data>
-  <data name="SectionGeneral.Text" xml:space="preserve">
-    <value>General</value>
-  </data>
-  <data name="CardLanguage.Header" xml:space="preserve">
-    <value>Language</value>
-  </data>
-  <data name="CardLanguage.Description" xml:space="preserve">
-    <value>Choose the display language</value>
-  </data>
   <!-- ===== Zoom controls (ZoomableImage.xaml) ===== -->
   <data name="PreviewImageA11y.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
     <value>Beautified screenshot preview</value>
   </data>
-  <data name="ZoomFit.Content" xml:space="preserve">
-    <value>Fit</value>
-  </data>
-  <data name="ZoomFit.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>Fit image to view</value>
-  </data>
-  <data name="ZoomHundred.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>Zoom to actual pixels</value>
-  </data>
-  <!-- ===== Status messages (MainViewModel via IUiStrings) ===== -->
-  <data name="StatusReady" xml:space="preserve">
-    <value>Ready. Capture the full screen or a region to begin.</value>
-  </data>
-  <data name="StatusCapturingFullScreen" xml:space="preserve">
-    <value>Capturing full screen…</value>
-  </data>
-  <data name="StatusRegionUnavailable" xml:space="preserve">
-    <value>Region capture is unavailable.</value>
-  </data>
-  <data name="StatusSelectRegion" xml:space="preserve">
-    <value>Select a region…</value>
-  </data>
-  <data name="StatusRegionCancelled" xml:space="preserve">
-    <value>Region capture cancelled.</value>
-  </data>
-  <data name="StatusCapturingRegion" xml:space="preserve">
-    <value>Capturing region…</value>
-  </data>
-  <data name="StatusWindowUnavailable" xml:space="preserve">
-    <value>Window capture is unavailable.</value>
-  </data>
-  <data name="StatusSelectWindow" xml:space="preserve">
-    <value>Select a window…</value>
-  </data>
-  <data name="StatusWindowCancelled" xml:space="preserve">
-    <value>Window capture cancelled.</value>
-  </data>
-  <data name="StatusCapturingWindow" xml:space="preserve">
-    <value>Capturing window…</value>
-  </data>
-  <data name="StatusSaveCancelled" xml:space="preserve">
-    <value>Save cancelled.</value>
-  </data>
-  <data name="StatusSavedFormat" xml:space="preserve">
-    <value>Saved to {0}</value>
-  </data>
-  <data name="StatusSaveFailedFormat" xml:space="preserve">
-    <value>Save failed: {0}</value>
-  </data>
-  <data name="StatusCopied" xml:space="preserve">
-    <value>Copied to clipboard.</value>
-  </data>
-  <data name="StatusCopyFailedFormat" xml:space="preserve">
-    <value>Copy failed: {0}</value>
-  </data>
-  <data name="StatusDimensionsFormat" xml:space="preserve">
-    <value>{0} × {1} px</value>
-  </data>
-  <data name="StatusErrorFormat" xml:space="preserve">
-    <value>Error: {0}</value>
-  </data>
-  <!-- ===== Background preset names (MainViewModel) ===== -->
-  <data name="BackgroundAuto" xml:space="preserve">
-    <value>Auto</value>
-  </data>
-  <data name="BackgroundNone" xml:space="preserve">
-    <value>None (transparent)</value>
-  </data>
-  <data name="BackgroundIndigoViolet" xml:space="preserve">
-    <value>Indigo → Violet</value>
-  </data>
-  <data name="BackgroundOcean" xml:space="preserve">
-    <value>Ocean</value>
-  </data>
-  <data name="BackgroundSunset" xml:space="preserve">
-    <value>Sunset</value>
-  </data>
-  <data name="BackgroundWhite" xml:space="preserve">
-    <value>Solid white</value>
-  </data>
-  <data name="BackgroundCharcoal" xml:space="preserve">
-    <value>Solid charcoal</value>
-  </data>
-  <!-- ===== Tray menu (App.xaml.cs -> TrayService) ===== -->
-  <data name="TrayCaptureRegion" xml:space="preserve">
-    <value>Capture region</value>
-  </data>
-  <data name="TrayCaptureFullScreen" xml:space="preserve">
-    <value>Capture full screen</value>
-  </data>
-  <data name="TrayExit" xml:space="preserve">
-    <value>Exit</value>
-  </data>
   <!-- ===== Save dialog (MainPage.xaml.cs) ===== -->
-  <data name="SaveFileTypePng" xml:space="preserve">
-    <value>PNG image</value>
-  </data>
-  <!-- ===== Settings dialog chrome + language switch (code-behind) ===== -->
-  <data name="SettingsTitle" xml:space="preserve">
-    <value>Settings</value>
-  </data>
-  <data name="SettingsCloseButton" xml:space="preserve">
-    <value>Done</value>
-  </data>
-  <data name="LanguageSystemDefault" xml:space="preserve">
-    <value>System default</value>
-  </data>
-  <data name="RestartDialogTitle" xml:space="preserve">
-    <value>Restart required</value>
-  </data>
-  <data name="RestartDialogBody" xml:space="preserve">
-    <value>Snaply will restart to apply the new display language.</value>
-  </data>
-  <data name="RestartNowButton" xml:space="preserve">
-    <value>Restart now</value>
-  </data>
-  <data name="RestartLaterButton" xml:space="preserve">
-    <value>Later</value>
-  </data>
+  <!-- ===== Export button labels (MainViewModel) ===== -->
   <!-- ===== Error visualization (ErrorPresenter / InfoBar) ===== -->
   <data name="Error_capture_monitor" xml:space="preserve">
     <value>Couldn't capture the screen.</value>
@@ -325,9 +131,6 @@
   <data name="ErrorCopyButton.Content" xml:space="preserve">
     <value>Copy</value>
   </data>
-  <data name="StatusHotkeyUnavailable" xml:space="preserve">
-    <value>Shortcut {0} is unavailable (already in use).</value>
-  </data>
   <!-- ===== Crash dialog (CrashHandler / App) ===== -->
   <data name="CrashTitle" xml:space="preserve">
     <value>Something went wrong</value>
@@ -344,39 +147,10 @@
   <data name="CrashClose" xml:space="preserve">
     <value>Close</value>
   </data>
-  <!-- ===== Diagnostics panel (SettingsDialog) ===== -->
-  <data name="CardLogs.Header" xml:space="preserve">
-    <value>Logs and crash reports</value>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Open the captures folder</value>
   </data>
-  <data name="CardLogs.Description" xml:space="preserve">
-    <value>Open the folder where logs and crash reports are saved</value>
-  </data>
-  <data name="OpenLogsButton.Content" xml:space="preserve">
-    <value>Open logs folder</value>
-  </data>
-  <data name="CopyDiagnosticsButton.Content" xml:space="preserve">
-    <value>Copy diagnostics</value>
-  </data>
-  <data name="CardVerboseLogging.Header" xml:space="preserve">
-    <value>Verbose logging</value>
-  </data>
-  <data name="CardVerboseLogging.Description" xml:space="preserve">
-    <value>Record extra detail to help track down problems</value>
-  </data>
-  <!-- ===== Rebuilt settings: beautify group + export button + diagnostics expander ===== -->
-  <data name="SectionBeautify.Text" xml:space="preserve">
-    <value>Beautify</value>
-  </data>
-  <data name="ExportSave" xml:space="preserve">
-    <value>Save PNG</value>
-  </data>
-  <data name="ExportCopy" xml:space="preserve">
-    <value>Copy</value>
-  </data>
-  <data name="ExpanderDiagnostics.Header" xml:space="preserve">
-    <value>Diagnostics</value>
-  </data>
-  <data name="ExpanderDiagnostics.Description" xml:space="preserve">
-    <value>Logs, crash reports, and app info</value>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Open the captures folder</value>
   </data>
 </root>

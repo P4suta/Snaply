@@ -1,15 +1,14 @@
 param([Parameter(Mandatory)][int]$AppPid)
 
 # Manual UI smoke test for the content-centric layout (run with the `winapp ui` tooling).
-# NOT wired into CI — it drives the live app by AutomationId. After the 2026 redesign:
+# NOT wired into CI — it drives the live app by AutomationId. After the settings-zero redesign:
 #   - the header row is gone; the primary capture control is a SplitButton
-#     (HeroCaptureButton when empty, PrimaryCaptureButton in the floating toolbar once
-#     an image exists), with per-mode menu items CaptureFullScreenItem / CaptureRegionItem
-#     / CaptureWindowItem (and *Item2 duplicates in the floating toolbar's menu);
-#   - Save/Copy float over the preview (SaveButton / CopyButton);
-#   - Settings lives in the title bar (SettingsButton); theme + beautify controls live
-#     inside the Settings dialog (ThemeSegmented / BackgroundComboBox / ShadowToggle /
-#     AspectComboBox / VerboseLoggingToggle).
+#     (PrimaryCaptureButton in the floating toolbar), with per-mode menu items
+#     CaptureFullScreenItem / CaptureRegionItem / CaptureWindowItem;
+#   - Save/Copy float over the preview (PrimaryExportButton);
+#   - there is no Settings dialog, no beautify toggle and no About button (Snaply always
+#     beautifies; app details live in the bundled files). The command bar is just Capture +
+#     Save/Copy. Theme and language follow the OS (no in-app switch).
 
 $ErrorActionPreference = 'Continue'
 $pass = 0; $fail = 0; $results = @()
@@ -34,7 +33,7 @@ function Test-UI {
 New-Item -ItemType Directory -Force -Path "screenshots" | Out-Null
 
 # --- 1. Persistent command bar / chrome AutomationIds resolve ---
-$ids = @("PrimaryCaptureButton", "SettingsButton", "StatusText", "PreviewImage")
+$ids = @("PrimaryCaptureButton", "StatusText", "PreviewImage")
 foreach ($id in $ids) {
     Test-UI "AutomationId resolves: $id" { winapp ui wait-for $id -a $AppPid -t 4000 }
 }
@@ -52,15 +51,7 @@ Test-UI "PrimaryExportButton present" { winapp ui wait-for "PrimaryExportButton"
 Test-UI "PrimaryExportButton enabled after capture" { winapp ui wait-for "PrimaryExportButton" -a $AppPid -p IsEnabled --value "True" -t 5000 }
 winapp ui screenshot -a $AppPid -o "screenshots/02-after-capture.png" 2>$null
 
-# --- 4. Settings dialog hosts theme + beautify controls ---
-Test-UI "Open Settings" { winapp ui invoke "SettingsButton" -a $AppPid }
-Start-Sleep -Seconds 1
-foreach ($id in @("ThemeSegmented", "BackgroundComboBox", "ShadowToggle", "AspectComboBox", "VerboseLoggingToggle")) {
-    Test-UI "Settings hosts: $id" { winapp ui wait-for $id -a $AppPid -t 3000 }
-}
-winapp ui screenshot -a $AppPid -o "screenshots/03-settings.png" 2>$null
-
-# --- 5. Accessibility audit: interactive controls have AutomationId ---
+# --- 4. Accessibility audit: interactive controls have AutomationId ---
 $allElements = (winapp ui inspect -a $AppPid --interactive --json 2>$null | ConvertFrom-Json).elements
 $appElements = @($allElements | Where-Object {
     $_.type -match 'Button|TextBox|ComboBox|CheckBox|ToggleSwitch|Slider|Segmented|SplitButton' -and

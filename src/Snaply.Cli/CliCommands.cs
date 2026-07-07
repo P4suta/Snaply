@@ -18,7 +18,6 @@ namespace Snaply.Cli;
 /// </summary>
 internal static class CliCommands
 {
-    private static readonly Option<bool> NoBeautifyOption = new("--no-beautify") { Description = "Skip beautify; keep the raw screenshot." };
     private static readonly Option<string?> BackgroundOption = new("--background", "-b") { Description = "auto | solid:#RRGGBB | gradient:#RRGGBB,#RRGGBB@135 | image:<path>" };
     private static readonly Option<string?> PaddingOption = new("--padding", "-p") { Description = "Padding: N or L,T,R,B (physical px)." };
     private static readonly Option<double?> CornerRadiusOption = new("--corner-radius", "-r") { Description = "Corner radius in physical px." };
@@ -138,7 +137,7 @@ internal static class CliCommands
         beautify.SetAction(async (parseResult, ct) =>
         {
             OutputContext output = Output(parseResult);
-            Result<BeautifySpec?> spec = MapBeautify(parseResult);
+            Result<BeautifySpec> spec = MapBeautify(parseResult);
             if (spec.IsFailure)
             {
                 return await output.FailAsync("beautify", spec.Error).ConfigureAwait(true);
@@ -152,18 +151,13 @@ internal static class CliCommands
             }
 
             var pipeline = provider.GetRequiredService<CapturePipeline>();
-
-            // With --no-beautify the input is re-encoded unchanged; otherwise the spec is applied.
-            BeautifySpec effective = spec.Value ?? BeautifySpec.Default;
-            Result<CapturedImage> result = spec.Value is null
-                ? raw
-                : await pipeline.BeautifyAsync(raw.Value, effective, ct).ConfigureAwait(true);
+            Result<CapturedImage> result = await pipeline.BeautifyAsync(raw.Value, spec.Value, ct).ConfigureAwait(true);
             if (result.IsFailure)
             {
                 return await output.FailAsync("beautify", result.Error).ConfigureAwait(true);
             }
 
-            return await WriteBeautifiedAsync(provider, output, parseResult, result.Value, spec.Value is not null, ct).ConfigureAwait(true);
+            return await WriteBeautifiedAsync(provider, output, parseResult, result.Value, ct).ConfigureAwait(true);
         });
         return beautify;
     }
@@ -251,7 +245,6 @@ internal static class CliCommands
 
     private static void AddBeautifyAndOutput(Command command)
     {
-        command.Options.Add(NoBeautifyOption);
         command.Options.Add(BackgroundOption);
         command.Options.Add(PaddingOption);
         command.Options.Add(CornerRadiusOption);
@@ -270,7 +263,7 @@ internal static class CliCommands
 
     private static async Task<int> RunCaptureCoreAsync(IServiceProvider provider, OutputContext output, ParseResult parseResult, string command, CaptureTarget target, CancellationToken ct)
     {
-        Result<BeautifySpec?> spec = MapBeautify(parseResult);
+        Result<BeautifySpec> spec = MapBeautify(parseResult);
         if (spec.IsFailure)
         {
             return await output.FailAsync(command, spec.Error).ConfigureAwait(true);
@@ -282,7 +275,7 @@ internal static class CliCommands
         return await CaptureExecutor.ExecuteAsync(provider, output, command, target, spec.Value, outputs, parseResult.GetValue(DelayOption), ct).ConfigureAwait(true);
     }
 
-    private static async Task<int> WriteBeautifiedAsync(IServiceProvider provider, OutputContext output, ParseResult parseResult, CapturedImage image, bool beautified, CancellationToken ct)
+    private static async Task<int> WriteBeautifiedAsync(IServiceProvider provider, OutputContext output, ParseResult parseResult, CapturedImage image, CancellationToken ct)
     {
         var outputs = new OutputTargets(parseResult.GetValue(OutOption), parseResult.GetValue(ClipboardOption), parseResult.GetValue(StdoutOption));
         output.RedirectHumanToErr = outputs.RawStdout;
@@ -342,7 +335,7 @@ internal static class CliCommands
             width = image.Size.Width,
             height = image.Size.Height,
             dpi = image.Dpi.Value,
-            beautified,
+            beautified = true,
             output = new { path = savedPath, clipboard = copied, stdout = outputs.RawStdout, bytes },
         };
 
@@ -471,8 +464,7 @@ internal static class CliCommands
 
     private static OutputContext Output(ParseResult parseResult) => Globals.Output(parseResult);
 
-    private static Result<BeautifySpec?> MapBeautify(ParseResult parseResult) => BeautifySpecMapper.Map(new BeautifyOptions(
-        NoBeautify: parseResult.GetValue(NoBeautifyOption),
+    private static Result<BeautifySpec> MapBeautify(ParseResult parseResult) => BeautifySpecMapper.Map(new BeautifyOptions(
         Background: parseResult.GetValue(BackgroundOption),
         Padding: parseResult.GetValue(PaddingOption),
         CornerRadius: parseResult.GetValue(CornerRadiusOption),
