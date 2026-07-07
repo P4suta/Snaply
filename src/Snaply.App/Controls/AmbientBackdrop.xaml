@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="Snaply.Controls.AmbientBackdrop"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:Snaply.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    IsHitTestVisible="False"
+    mc:Ignorable="d">
+
+    <!--  A slowly drifting field of coloured light for the empty canvas. A base wash fills the whole
+          surface with accent-seeded colour; several large radial-gradient blobs (created in code so
+          they scale with the canvas and cover it fully) glide and breathe over it via Composition on
+          their own long, mutually-prime periods, so the field never settles into an obvious loop.
+          Purely decorative — takes no pointer input; clipped to its bounds in code (SizeChanged).  -->
+    <Grid x:Name="Root">
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop x:Name="BaseWashStop0" Offset="0.0" Color="Transparent" />
+                <GradientStop x:Name="BaseWashStop1" Offset="1.0" Color="Transparent" />
+            </LinearGradientBrush>
+        </Grid.Background>
+    </Grid>
+</UserControl>

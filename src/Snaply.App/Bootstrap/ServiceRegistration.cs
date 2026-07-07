@@ -1,6 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Snaply.Core.Ports;
 using Snaply.Diagnostics;
 using Snaply.Platform;
 using Snaply.Services;
@@ -11,10 +9,9 @@ namespace Snaply.Bootstrap;
 /// <summary>
 /// The composition root. Composes the shared layers (<c>AddSnaplyApplication</c> +
 /// <c>AddSnaplyLogging</c> from Snaply.Application, <c>AddSnaplyPlatform</c> from
-/// Snaply.Platform) and adds only the GUI-residency services on top — the tray icon,
-/// global hotkeys, view models and presentation helpers that exist solely because this
-/// host has a window. The CLI / MCP hosts reuse the same shared extensions without this
-/// GUI residue.
+/// Snaply.Platform) and adds only the presentation services on top — the view model and
+/// UI helpers that exist solely because this host has a window. The CLI / MCP hosts reuse
+/// the same shared extensions without this GUI residue.
 /// </summary>
 public static class ServiceRegistration
 {
@@ -24,29 +21,17 @@ public static class ServiceRegistration
     {
         var services = new ServiceCollection();
 
-        // Shared layers. The settings store is created up front so the log level can be read
-        // before the logging provider exists; AddSnaplyLogging registers that same instance.
-        var settingsStore = new SettingsStore();
-        services.AddSnaplyApplication(settingsStore);
-        services.AddSnaplyLogging(settingsStore, console: false);
+        // Shared layers (capture/beautify pipeline + file-only logging).
+        services.AddSnaplyApplication();
+        services.AddSnaplyLogging(console: false);
         services.AddSnaplyPlatform();
 
-        // GUI-residency services (a window, tray icon, and message-loop hotkey thread) plus the
-        // presentation layer. None of these belong to the headless CLI / MCP hosts.
-        services.AddSingleton<IHotkeyService, Win32HotkeyService>();
-        services.AddSingleton<ITrayService, TrayService>();
+        // Presentation layer — the view model and UI-string resolver that exist only because
+        // this host has a window. None of these belong to the headless CLI / MCP hosts.
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<IUiStrings, ResourceUiStrings>();
         services.AddSingleton<ErrorPresenter>();
-        services.AddSingleton<ThemeService>();
-        services.AddSingleton<LanguageService>();
 
-        ServiceProvider provider = services.BuildServiceProvider();
-
-        // The store was created before logging existed (to read the log-level preference);
-        // give it a logger now so settings read/write failures are recorded.
-        settingsStore.Logger = provider.GetRequiredService<ILogger<SettingsStore>>();
-
-        return provider;
+        return services.BuildServiceProvider();
     }
 }

@@ -111,6 +111,36 @@ public class BeautifyDefaultsTests
         Assert.Equal(255, gradient.End.A);
     }
 
+    [Fact]
+    public void OklchToRgba_IsDeterministicAndOpaque()
+    {
+        Rgba a = BeautifyDefaults.OklchToRgba(0.8, 0.1, 210);
+        Rgba b = BeautifyDefaults.OklchToRgba(0.8, 0.1, 210);
+        Assert.Equal(a, b);       // pure function
+        Assert.Equal(255, a.A);   // always opaque
+    }
+
+    [Fact]
+    public void OklchToRgba_StaysInGamutAcrossTheHueWheel()
+    {
+        // Every hue at a soft pastel lightness/chroma must land on a valid, non-degenerate sRGB
+        // colour (the conversion clamps into gamut) — the basis of the ambient backdrop's palette.
+        for (int hue = 0; hue < 360; hue += 15)
+        {
+            Rgba c = BeautifyDefaults.OklchToRgba(0.8, 0.09, hue);
+            Assert.Equal(255, c.A);
+            Assert.True(c.R > 0 || c.G > 0 || c.B > 0); // not pure black
+        }
+    }
+
+    [Fact]
+    public void OklchToRgba_HigherLightnessIsBrighter()
+    {
+        Rgba dim = BeautifyDefaults.OklchToRgba(0.4, 0.08, 90);
+        Rgba bright = BeautifyDefaults.OklchToRgba(0.85, 0.08, 90);
+        Assert.True(bright.R + bright.G + bright.B > dim.R + dim.G + dim.B);
+    }
+
     private static CapturedImage SolidImage(byte r, byte g, byte b)
     {
         var size = new PhysicalSize(8, 8);

@@ -20,17 +20,11 @@ internal static partial class AppLog
     [LoggerMessage(EventId = 2003, Level = LogLevel.Error, Message = "Unobserved task exception")]
     public static partial void UnobservedTaskException(ILogger logger, Exception exception);
 
-    [LoggerMessage(EventId = 2006, Level = LogLevel.Warning, Message = "Global hotkey unavailable for '{Chord}': {Reason}")]
-    public static partial void HotkeyUnavailable(ILogger logger, string chord, string reason);
-
     [LoggerMessage(EventId = 2007, Level = LogLevel.Information, Message = "Crash dump written to {Path}")]
     public static partial void CrashDumpWritten(ILogger logger, string path);
 
     [LoggerMessage(EventId = 2008, Level = LogLevel.Error, Message = "Failed to write crash dump")]
     public static partial void CrashDumpFailed(ILogger logger, Exception exception);
-
-    [LoggerMessage(EventId = 2009, Level = LogLevel.Error, Message = "Capture routing failed for {Action}")]
-    public static partial void CaptureRoutingFailed(ILogger logger, string action, Exception exception);
 
     [LoggerMessage(EventId = 2010, Level = LogLevel.Warning, Message = "Failed to open the logs folder")]
     public static partial void OpenLogsFailed(ILogger logger);

@@ -7,9 +7,7 @@ namespace Snaply.Platform;
 /// Composition helper that binds the headless-common Core ports to their Platform
 /// adapters (capture, window enumeration, beautify renderer, export). Shared by every
 /// host — the WinUI app, the CLI, and the MCP server — so the port→adapter wiring lives
-/// in one place. GUI-residency services (<see cref="IHotkeyService"/>, <see cref="ITrayService"/>)
-/// are deliberately excluded: they own a message-loop thread and a tray icon and belong
-/// only to the WinUI app's composition root.
+/// in one place.
 /// </summary>
 public static class PlatformServiceCollectionExtensions
 {

@@ -1,14 +1,12 @@
+using System.Globalization;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Snaply.Bootstrap;
-using Snaply.Core;
-using Snaply.Core.Ports;
 using Snaply.Diagnostics;
 using Snaply.Services;
-using Snaply.ViewModels;
 
 namespace Snaply;
 
@@ -19,8 +17,6 @@ namespace Snaply;
 /// </summary>
 public partial class App : Microsoft.UI.Xaml.Application
 {
-    private ITrayService? _tray;
-    private IHotkeyService? _hotkey;
     private ILogger<App>? _logger;
     private bool _exiting;
 
@@ -77,19 +73,13 @@ public partial class App : Microsoft.UI.Xaml.Application
             DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             _logger = Services.GetRequiredService<ILogger<App>>();
 
-            // Apply the persisted display language before any window or resource loads, so
-            // MRT/x:Uid resolve strings in the chosen language for this session.
-            LanguageService language = Services.GetRequiredService<LanguageService>();
-            language.Apply();
-
-            string languageName = language.CurrentLanguage.ToString();
-            AppLog.Started(_logger, AppVersion, languageName);
+            // Snaply follows the OS display language: MRT/x:Uid resolve against the user's Windows
+            // language list, so there is no override to apply — just record the effective culture.
+            AppLog.Started(_logger, AppVersion, CultureInfo.CurrentUICulture.Name);
 
             Window = new MainWindow();
             Window.Closed += OnWindowClosed;
             Window.Activate();
-
-            WireTrayAndHotkeys();
         }
         catch (Exception ex)
         {
@@ -102,79 +92,6 @@ public partial class App : Microsoft.UI.Xaml.Application
     // Computed once (reflection) so logging call sites pass a cheap field, not an expensive expression.
     private static readonly string AppVersion =
         Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
-
-    private void WireTrayAndHotkeys()
-    {
-        // Tray: Show() and its events run on this (UI) thread. The App layer owns the
-        // localized strings and hands them to the Platform adapter as plain captions.
-        IUiStrings strings = Services.GetRequiredService<IUiStrings>();
-        var trayLabels = new TrayMenuLabels(
-            CaptureRegion: strings.Get("TrayCaptureRegion"),
-            CaptureFullScreen: strings.Get("TrayCaptureFullScreen"),
-            Exit: strings.Get("TrayExit"),
-            ToolTip: "Snaply");
-
-        _tray = Services.GetRequiredService<ITrayService>();
-        _tray.CaptureRequested += (_, action) => DispatcherQueue.TryEnqueue(() => RouteCapture(action));
-        _tray.ExitRequested += (_, _) => DispatcherQueue.TryEnqueue(ExitApp);
-        _tray.Show(trayLabels);
-
-        // Hotkeys: Pressed fires on a worker thread, so marshal to the UI thread.
-        _hotkey = Services.GetRequiredService<IHotkeyService>();
-        RegisterHotkey(HotkeyAction.CaptureRegion, "PrintScreen");
-        RegisterHotkey(HotkeyAction.CaptureFullScreen, "Ctrl+Shift+2");
-        _hotkey.Pressed += (_, action) => DispatcherQueue.TryEnqueue(() => RouteCapture(action));
-    }
-
-    // Register a global hotkey, logging and surfacing failure (e.g. the chord is already
-    // taken by another app) instead of silently discarding the Result as before.
-    private void RegisterHotkey(HotkeyAction action, string chord)
-    {
-        Result result = _hotkey!.Register(action, chord);
-        if (result.IsSuccess)
-        {
-            return;
-        }
-
-        if (_logger is not null)
-        {
-            AppLog.HotkeyUnavailable(_logger, chord, result.Error.Message);
-        }
-
-        // Surface once on the shared status line so the user knows the shortcut is unavailable.
-        MainViewModel viewModel = Services.GetRequiredService<MainViewModel>();
-        viewModel.StatusMessage = Services.GetRequiredService<IUiStrings>().Format("StatusHotkeyUnavailable", chord);
-    }
-
-    private void RouteCapture(HotkeyAction action)
-    {
-        try
-        {
-            MainViewModel viewModel = Services.GetRequiredService<MainViewModel>();
-
-            // Bring the window forward so the region overlay / preview is visible.
-            Window.Activate();
-
-            if (action == HotkeyAction.CaptureFullScreen)
-            {
-                if (viewModel.CaptureFullScreenCommand.CanExecute(null))
-                {
-                    viewModel.CaptureFullScreenCommand.Execute(null);
-                }
-            }
-            else if (viewModel.CaptureRegionCommand.CanExecute(null))
-            {
-                viewModel.CaptureRegionCommand.Execute(null);
-            }
-        }
-        catch (Exception ex)
-        {
-            if (_logger is not null)
-            {
-                AppLog.CaptureRoutingFailed(_logger, action.ToString(), ex);
-            }
-        }
-    }
 
     // --- Global exception safety net -----------------------------------------
     private void OnUiUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
@@ -280,10 +197,8 @@ public partial class App : Microsoft.UI.Xaml.Application
 
         _exiting = true;
 
-        // Dispose the capture device, hotkey message loop and tray icon. The
-        // container owns the singletons, so disposing it disposes them all.
-        _hotkey = null;
-        _tray = null;
+        // The container owns every singleton (including the native capture device), so
+        // disposing it disposes them all.
         (Services as IDisposable)?.Dispose();
 
         Exit();

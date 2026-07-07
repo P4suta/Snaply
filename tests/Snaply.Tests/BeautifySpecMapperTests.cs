@@ -14,20 +14,10 @@ public class BeautifySpecMapperTests
     [Fact]
     public void NoOptions_YieldsTheDefaultSpec()
     {
-        Result<BeautifySpec?> result = BeautifySpecMapper.Map(new BeautifyOptions());
+        Result<BeautifySpec> result = BeautifySpecMapper.Map(new BeautifyOptions());
 
         Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Value);
-        Assert.Equal(BeautifySpec.Default.Background, result.Value!.Background);
-    }
-
-    [Fact]
-    public void NoBeautify_YieldsNullSpec()
-    {
-        Result<BeautifySpec?> result = BeautifySpecMapper.Map(new BeautifyOptions(NoBeautify: true));
-
-        Assert.True(result.IsSuccess);
-        Assert.Null(result.Value); // null == keep the raw capture
+        Assert.Equal(BeautifySpec.Default.Background, result.Value.Background);
     }
 
     [Fact]
@@ -128,7 +118,7 @@ public class BeautifySpecMapperTests
     [InlineData("gradient:#000000")]
     public void Background_Invalid_FailsWithInputInvalid(string background)
     {
-        Result<BeautifySpec?> result = BeautifySpecMapper.Map(new BeautifyOptions(Background: background));
+        Result<BeautifySpec> result = BeautifySpecMapper.Map(new BeautifyOptions(Background: background));
         Assert.True(result.IsFailure);
         Assert.Equal(ErrorCodes.InputInvalid, result.Error.Code);
     }
@@ -136,7 +126,7 @@ public class BeautifySpecMapperTests
     [Fact]
     public void Aspect_Invalid_FailsWithInputInvalid()
     {
-        Result<BeautifySpec?> result = BeautifySpecMapper.Map(new BeautifyOptions(Aspect: "panoramic"));
+        Result<BeautifySpec> result = BeautifySpecMapper.Map(new BeautifyOptions(Aspect: "panoramic"));
         Assert.True(result.IsFailure);
         Assert.Equal(ErrorCodes.InputInvalid, result.Error.Code);
     }
@@ -170,7 +160,7 @@ public class BeautifySpecMapperTests
     [InlineData("x")] // non-numeric
     public void Padding_Invalid_Fails(string padding)
     {
-        Result<BeautifySpec?> result = BeautifySpecMapper.Map(new BeautifyOptions(Padding: padding));
+        Result<BeautifySpec> result = BeautifySpecMapper.Map(new BeautifyOptions(Padding: padding));
         Assert.True(result.IsFailure);
         Assert.Equal(ErrorCodes.InputInvalid, result.Error.Code);
     }
@@ -216,9 +206,8 @@ public class BeautifySpecMapperTests
 
     private static BeautifySpec MapOk(BeautifyOptions options)
     {
-        Result<BeautifySpec?> result = BeautifySpecMapper.Map(options);
+        Result<BeautifySpec> result = BeautifySpecMapper.Map(options);
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Message : null);
-        Assert.NotNull(result.Value);
-        return result.Value!;
+        return result.Value;
     }
 }

@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Numerics;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Input;
@@ -17,14 +16,14 @@ namespace Snaply.Controls;
 /// so at scale <c>1.0</c> it already fits the viewport (the "fit" baseline); the element's
 /// Composition <see cref="Visual.Scale"/>/<see cref="Visual.Offset"/> then scale/translate from
 /// there. Mouse-wheel zooms about the cursor, left-drag pans, double-tap resets to fit, and a
-/// floating bar offers Fit / 100% buttons plus a live zoom-percent label.
+/// floating fit-to-view button (bottom-right) resets the zoom.
 /// </summary>
 /// <remarks>
-/// Zoom (wheel, Fit, 100%, double-tap) glides via GPU-composited key-frame animations with a
-/// cubic ease-out, so rapid consecutive notches retarget smoothly from the current in-flight
-/// value instead of snapping. Panning writes the offset directly so the drag stays 1:1 with the
-/// cursor. The <c>_scale</c>/<c>_translateX</c>/<c>_translateY</c> fields always hold the
-/// <em>target</em> state, so the cursor-anchor math stays pixel-correct at rest.
+/// Zoom (wheel, Fit, double-tap) glides via GPU-composited spring animations, so rapid consecutive
+/// notches retarget smoothly from the current in-flight value instead of snapping. Panning writes
+/// the offset directly so the drag stays 1:1 with the cursor. The <c>_scale</c>/<c>_translateX</c>/
+/// <c>_translateY</c> fields always hold the <em>target</em> state, so the cursor-anchor math stays
+/// pixel-correct at rest.
 /// </remarks>
 public sealed partial class ZoomableImage : UserControl
 {
@@ -35,10 +34,15 @@ public sealed partial class ZoomableImage : UserControl
         typeof(ZoomableImage),
         new PropertyMetadata(null, OnSourceChanged));
 
-    // Zoom limits and per-notch multiplier. Scale is relative to the fit baseline (1.0).
-    private const double MinScale = 0.1;
+    // Zoom limits and per-notch multiplier. Scale is relative to the fit baseline (1.0), which is
+    // also the floor: Fit is as small as it gets — the wheel only zooms in, never below Fit.
+    private const double MinScale = 1.0;
     private const double MaxScale = 8.0;
     private const double ZoomStep = 1.1;
+
+    // Z translation kept on the image at all times so its ThemeShadow reads as a floating lift over
+    // the ambient backdrop (carried in the composition Translation alongside the pan offset).
+    private const float ShadowDepth = 32f;
 
     // Spring motion for zoom. A spring continuously chases its FinalValue, so retargeting it
     // on every wheel notch produces one uninterrupted, momentum-preserving glide (no per-notch
@@ -58,8 +62,6 @@ public sealed partial class ZoomableImage : UserControl
     private double _scale = 1.0;
     private double _translateX;
     private double _translateY;
-    private double _naturalWidth;
-    private double _naturalHeight;
     private bool _isPanning;
     private Point _lastPoint;
 
@@ -68,6 +70,10 @@ public sealed partial class ZoomableImage : UserControl
     {
         InitializeComponent();
         ProtectedCursor = ArrowCursor;
+
+        // Empty until a capture arrives: stay out of the pointer's way (no pan cursor / no zoom) so
+        // the empty canvas — and the ambient backdrop showing through — reads as inert, not a viewer.
+        Viewport.IsHitTestVisible = false;
 
         // Drive Scale/Offset on the image's backing Composition visual. Composition runs on the
         // compositor thread, synced to the display's refresh (60/120/144Hz+), so motion stays
@@ -102,18 +108,22 @@ public sealed partial class ZoomableImage : UserControl
         var source = e.NewValue as ImageSource;
         control.DisplayImage.Source = source;
 
+        // Zoom/pan only make sense once there's an image; while empty the viewer is inert so it
+        // never shows a pan cursor over the ambient backdrop.
+        control.Viewport.IsHitTestVisible = source is not null;
+
+        // Never upscale: cap the element at the image's native pixel size so a capture smaller than
+        // the viewport shows at 100% (centred) rather than being blown up; larger captures still fit.
         if (source is BitmapSource bitmap)
         {
-            control._naturalWidth = bitmap.PixelWidth;
-            control._naturalHeight = bitmap.PixelHeight;
+            control.DisplayImage.MaxWidth = bitmap.PixelWidth;
+            control.DisplayImage.MaxHeight = bitmap.PixelHeight;
         }
         else
         {
-            control._naturalWidth = 0;
-            control._naturalHeight = 0;
+            control.DisplayImage.MaxWidth = double.PositiveInfinity;
+            control.DisplayImage.MaxHeight = double.PositiveInfinity;
         }
-
-        control.ZoomControlsBar.Visibility = source is null ? Visibility.Collapsed : Visibility.Visible;
 
         // A brand-new image should appear fitted immediately, not glide in from the old view.
         control.ResetToFit(animate: false);
@@ -124,7 +134,6 @@ public sealed partial class ZoomableImage : UserControl
         // Clip the (transformed) image to the viewport so panned/zoomed pixels never
         // spill over the neighbouring panels.
         Viewport.Clip = new RectangleGeometry { Rect = new Rect(0, 0, Viewport.ActualWidth, Viewport.ActualHeight) };
-        UpdateLabel();
     }
 
     private void OnPointerWheelChanged(object sender, PointerRoutedEventArgs e)
@@ -188,14 +197,6 @@ public sealed partial class ZoomableImage : UserControl
 
     private void OnDoubleTapped(object sender, DoubleTappedRoutedEventArgs e) => ResetToFit(animate: true);
 
-    private void OnFitClick(object sender, RoutedEventArgs e) => ResetToFit(animate: true);
-
-    private void OnHundredClick(object sender, RoutedEventArgs e)
-    {
-        double target = Math.Clamp(HundredPercentScale(), MinScale, MaxScale);
-        ZoomAbout(new Point(Viewport.ActualWidth / 2, Viewport.ActualHeight / 2), target);
-    }
-
     /// <summary>Scale to <paramref name="newScale"/> while keeping <paramref name="anchor"/> fixed on screen.</summary>
     private void ZoomAbout(Point anchor, double newScale)
     {
@@ -204,9 +205,14 @@ public sealed partial class ZoomableImage : UserControl
             return;
         }
 
+        // The element is centred, so the composition maps a content point p to
+        // (layoutOffset + scale*p + translate). Anchor the zoom about the cursor by solving for the
+        // new translate that holds the content point currently under the cursor in place.
         double factor = newScale / _scale;
-        _translateX = anchor.X - (factor * (anchor.X - _translateX));
-        _translateY = anchor.Y - (factor * (anchor.Y - _translateY));
+        double offsetX = (Viewport.ActualWidth - DisplayImage.ActualWidth) / 2.0;
+        double offsetY = (Viewport.ActualHeight - DisplayImage.ActualHeight) / 2.0;
+        _translateX = (anchor.X - offsetX) - (factor * (anchor.X - offsetX - _translateX));
+        _translateY = (anchor.Y - offsetY) - (factor * (anchor.Y - offsetY - _translateY));
         _scale = newScale;
         ApplyTransformAnimated();
     }
@@ -236,10 +242,9 @@ public sealed partial class ZoomableImage : UserControl
     {
         ClampTranslation();
         _scaleSpring.FinalValue = new Vector3((float)_scale, (float)_scale, 1f);
-        _offsetSpring.FinalValue = new Vector3((float)_translateX, (float)_translateY, 0f);
+        _offsetSpring.FinalValue = new Vector3((float)_translateX, (float)_translateY, ShadowDepth);
         _imageVisual.StartAnimation("Scale", _scaleSpring);
         _imageVisual.StartAnimation("Translation", _offsetSpring);
-        UpdateLabel();
     }
 
     /// <summary>Write the current target scale/offset immediately (used for panning and new-image fit).</summary>
@@ -249,59 +254,36 @@ public sealed partial class ZoomableImage : UserControl
 
         // A direct property set stops any in-flight animation on that property, then holds.
         _imageVisual.Scale = new Vector3((float)_scale, (float)_scale, 1f);
-        _imageVisual.Properties.InsertVector3("Translation", new Vector3((float)_translateX, (float)_translateY, 0f));
-        UpdateLabel();
+        _imageVisual.Properties.InsertVector3("Translation", new Vector3((float)_translateX, (float)_translateY, ShadowDepth));
     }
 
-    // Keep the (scaled) image overlapping the viewport so it can never be shoved out of sight.
-    // The image element fills the viewport at scale 1 and the visual scales from its top-left, so
-    // the element spans [translate, translate + viewport*scale] on each axis.
+    // Keep the (scaled) image an exact fit to the viewport: it can be panned only as far as its own
+    // edges — no over-pan slack, no gap. The centred element wraps its content tightly (no letterbox),
+    // so clamping against the element's own bounds is symmetric regardless of aspect.
     private void ClampTranslation()
     {
-        _translateX = ClampAxis(_translateX, Viewport.ActualWidth, _scale);
-        _translateY = ClampAxis(_translateY, Viewport.ActualHeight, _scale);
+        _translateX = ClampAxis(_translateX, Viewport.ActualWidth, DisplayImage.ActualWidth, _scale);
+        _translateY = ClampAxis(_translateY, Viewport.ActualHeight, DisplayImage.ActualHeight, _scale);
     }
 
-    private static double ClampAxis(double translate, double viewport, double scale)
+    private static double ClampAxis(double translate, double viewport, double element, double scale)
     {
-        if (viewport <= 0)
+        if (viewport <= 0 || element <= 0)
         {
             return translate;
         }
 
-        double scaled = viewport * scale;
+        // Content is laid out centred (offset) and the visual scales from the element's top-left,
+        // so on-screen it spans [offset + translate, offset + translate + content].
+        double offset = (viewport - element) / 2.0;
+        double content = element * scale;
+        double lower = viewport - offset - content;
+        double upper = -offset;
 
-        // Zoomed in: no empty gap at the edges. Zoomed out: stay fully within the viewport.
-        return scaled >= viewport
-            ? Math.Clamp(translate, viewport - scaled, 0.0)
-            : Math.Clamp(translate, 0.0, viewport - scaled);
-    }
-
-    /// <summary>
-    /// The scale at which one image pixel maps to one physical screen pixel. Fit displays the
-    /// image at <c>fitFactor</c> DIPs per image-pixel; multiplying by the rasterization scale
-    /// converts DIPs to physical pixels, so actual-pixels is <c>1 / (fitFactor * rasterizationScale)</c>.
-    /// Falls back to the fit baseline when the natural size or viewport is not yet known.
-    /// </summary>
-    private double HundredPercentScale()
-    {
-        double viewportWidth = Viewport.ActualWidth;
-        double viewportHeight = Viewport.ActualHeight;
-        if (_naturalWidth <= 0 || _naturalHeight <= 0 || viewportWidth <= 0 || viewportHeight <= 0)
-        {
-            return 1.0;
-        }
-
-        double fitFactor = Math.Min(viewportWidth / _naturalWidth, viewportHeight / _naturalHeight);
-        double raster = XamlRoot?.RasterizationScale ?? 1.0;
-        double actual = fitFactor * raster;
-        return actual > 0 ? 1.0 / actual : 1.0;
-    }
-
-    private void UpdateLabel()
-    {
-        double hundred = HundredPercentScale();
-        double percent = hundred > 0 ? _scale / hundred * 100.0 : _scale * 100.0;
-        ZoomLabel.Text = string.Create(CultureInfo.CurrentCulture, $"{percent:0}%");
+        // Content smaller than the viewport can't be panned — hold it centred. Otherwise pan only
+        // until an edge meets the matching viewport edge (a flush, exact fit — no slack).
+        return lower > upper
+            ? ((viewport - content) / 2.0) - offset
+            : Math.Clamp(translate, lower, upper);
     }
 }

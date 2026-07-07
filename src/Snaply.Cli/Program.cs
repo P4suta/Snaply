@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Snaply.Application;
 using Snaply.Platform;
 
@@ -38,13 +37,10 @@ internal static class Program
     /// </summary>
     private static ServiceProvider BuildServices()
     {
-        var settingsStore = new SettingsStore();
         var services = new ServiceCollection();
-        services.AddSnaplyApplication(settingsStore);
-        services.AddSnaplyLogging(settingsStore, console: false);
+        services.AddSnaplyApplication();
+        services.AddSnaplyLogging(console: false);
         services.AddSnaplyPlatform();
-        ServiceProvider provider = services.BuildServiceProvider();
-        settingsStore.Logger = provider.GetRequiredService<ILogger<SettingsStore>>();
-        return provider;
+        return services.BuildServiceProvider();
     }
 }

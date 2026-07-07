@@ -80,11 +80,32 @@ public sealed class WgcScreenCaptureService : IScreenCaptureService, IDisposable
             return Result<CapturedImage>.Fail(ErrorCodes.CaptureWindow, "Window handle must be non-zero.");
         }
 
+        // Render the window itself via PrintWindow (no desktop bleed at the soft edge). If PrintWindow
+        // draws nothing (some protected/hardware windows), fall through to the WGC + inset crop path.
+        if (WindowPrinter.TryCapture(windowHandle, out CapturedImage? printed))
+        {
+            return Result<CapturedImage>.Ok(printed);
+        }
+
         try
         {
             using CanvasBitmap bitmap = await CaptureItemAsync(CreateItemForWindow(windowHandle), cancellationToken).ConfigureAwait(false);
-            var size = new PhysicalSize((int)bitmap.SizeInPixels.Width, (int)bitmap.SizeInPixels.Height);
-            return Result<CapturedImage>.Ok(new CapturedImage(size, bitmap.GetPixelBytes(), DpiProvider.GetForWindow(windowHandle)));
+            int w = (int)bitmap.SizeInPixels.Width;
+            int h = (int)bitmap.SizeInPixels.Height;
+            Dpi dpi = DpiProvider.GetForWindow(windowHandle);
+
+            // WGC returns the window at its visible frame, but the outermost ring is the window's
+            // semi-transparent rounded-corner/border edge composited over the desktop. Trim one
+            // logical pixel off every side to drop that background-bleed halo.
+            int inset = Math.Max(0, (int)Math.Round(dpi.Scale));
+            if (inset == 0 || w - (2 * inset) <= 0 || h - (2 * inset) <= 0)
+            {
+                return Result<CapturedImage>.Ok(new CapturedImage(new PhysicalSize(w, h), bitmap.GetPixelBytes(), dpi));
+            }
+
+            var cropped = new PhysicalSize(w - (2 * inset), h - (2 * inset));
+            byte[] pixels = bitmap.GetPixelBytes(inset, inset, cropped.Width, cropped.Height);
+            return Result<CapturedImage>.Ok(new CapturedImage(cropped, pixels, dpi));
         }
         catch (OperationCanceledException)
         {
