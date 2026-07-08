@@ -24,12 +24,12 @@ jobs:
       - name: Restore (locked)
         run: mise exec -- dotnet restore tests/Snaply.Tests/Snaply.Tests.csproj --locked-mode
       - name: Install Stryker.NET
-        run: mise exec -- dotnet tool install --global dotnet-stryker --version 4.6.0
+        run: mise exec -- dotnet tool install --global dotnet-stryker --version 4.16.0
       - name: Mutation test Snaply.Core
         working-directory: tests/Snaply.Tests
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
-          dotnet stryker --project Snaply.Core.csproj --break-at 60 --reporter progress --reporter html
+          dotnet stryker --project Snaply.Core.csproj --break-at 80 --reporter progress --reporter html
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
