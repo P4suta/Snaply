@@ -34,22 +34,29 @@ Token-Permissions check rewards.
 - **OpenSSF Scorecard** (`scorecard.yml`) — weekly posture scan; results feed
   the README badge and the Security tab.
 - **SBOM + osv-scanner** (`sbom-monitor.yml` and the release build) — a
-  CycloneDX SBOM is generated from the resolved graph and scanned for known
-  vulnerabilities.
+  CycloneDX SBOM is generated from the resolved NuGet graph of the whole shipped
+  solution (both apphosts — the WinUI app **and** the CLI/MCP server — with test
+  projects excluded) and scanned for known vulnerabilities. The bundled .NET and
+  ASP.NET Core runtime travel via a shared `FrameworkReference` (pinned by the
+  SDK, not a NuGet package), so their versions aren't listed as SBOM components;
+  they are fixed by the `mise.toml` SDK pin instead.
 
 ## Signed, attested releases
 
 Release artifacts are:
 
-- **Authenticode-signed** — the first-party PE files (`Snaply.exe`,
-  `app\Snaply.App.exe`) are signed via SSL.com eSigner in an approval-gated
+- **Authenticode-signed** — all of Snaply's own PE files (the three
+  apphost/launcher exes plus the first-party managed assemblies; see
+  `scripts/sign-map.ps1`) are signed via SSL.com eSigner in an approval-gated
   `release` environment. Signing is verified (chain + RFC 3161 timestamp +
   signer subject) before the release is published; an unsigned bundle fails at
   the irreversible boundary. (Dormant until the signing secrets are configured
   — see [SIGNING.md](SIGNING.md).)
 - **Provenance-attested** — keyless [Sigstore](https://www.sigstore.dev/)
   build-provenance and SBOM attestations are written via the workflow's OIDC
-  token (no stored keys). Verify a download:
+  token (no stored keys). The attestation subject is the released **zip** (by
+  digest), so verification is per-download rather than per-PE — the individual
+  PEs carry their own Authenticode signatures. Verify a download:
 
   ```sh
   gh attestation verify snaply-*-win-x64.zip --repo P4suta/Snaply

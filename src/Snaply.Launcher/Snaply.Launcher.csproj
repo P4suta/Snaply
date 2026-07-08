@@ -17,7 +17,10 @@
     <ApplicationIcon>..\Snaply.App\Assets\AppIcon.ico</ApplicationIcon>
     <Product>Snaply</Product>
     <AssemblyTitle>Snaply</AssemblyTitle>
-    <Version>0.1.0</Version>
+    <!-- Version is inherited from Directory.Build.props (the single, release-please-managed
+         source of truth). Do NOT re-declare it here: a local <Version> overrides the shared
+         one and drifts, so the root Snaply.exe would carry a stale version in dev/nightly
+         builds (release stamps -p:Version explicitly, which masked the bug). -->
   </PropertyGroup>
 
 </Project>
