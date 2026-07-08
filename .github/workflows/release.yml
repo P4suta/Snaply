@@ -39,9 +39,13 @@ on:
         default: true
         type: boolean
 
-# One release per ref at a time; never cancel a run mid-sign/mid-publish.
+# One release per *version* at a time; never cancel a run mid-sign/mid-publish.
+# Keyed on the tag (not github.ref, which is always refs/heads/main here since
+# release-please dispatches --ref main) so distinct versions — e.g. a hotfix
+# alongside a normal release — can run concurrently, while a re-dispatch of the
+# same tag serializes.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag_name }}
   cancel-in-progress: false
 
 # Least privilege: read-only at the top level; each job requests only what it needs.
@@ -70,12 +74,26 @@ jobs:
     steps:
       # Fail fast on a publishing run pointed at a non-version ref before the
       # gated `sign` job burns a reviewer approval on a misfire.
-      - name: Validate tag for a publishing run
+      - name: Validate inputs for a publishing run
         if: ${{ inputs.publish }}
         shell: bash
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
         run: |
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::publishing run requires a vX.Y.Z tag, got '$TAG' (use publish=false for a signing smoke test from a branch)"
+            exit 1
+          fi
+          # A publishing run checks out $REF = sha (the tag doesn't exist until publish
+          # creates it), so an empty sha makes checkout try the not-yet-existent tag and
+          # fail with a confusing 'ref not found'. release-please always passes the sha;
+          # a manual publish must too. Also validate its shape when present.
+          if [[ -z "$INPUT_SHA" ]]; then
+            echo "::error::a publishing run needs the 'sha' input (the vX.Y.Z tag does not exist yet; release-please passes the release commit sha)"
+            exit 1
+          fi
+          if [[ ! "$INPUT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::sha must be a full 40-char lowercase commit SHA, got '$INPUT_SHA'"
             exit 1
           fi
 
@@ -135,7 +153,10 @@ jobs:
     env:
       # secrets.* cannot be referenced in `if:`; hoist presence to a job-level
       # env bool, then gate the signing steps on env.HAVE_SIGNING.
-      HAVE_SIGNING: ${{ secrets.ES_USERNAME != '' && secrets.CREDENTIAL_ID != '' }}
+      # All four eSigner secrets must be present, not just two: batch_sign needs the
+      # password and TOTP as well, so a partial config would flip HAVE_SIGNING true and
+      # then fail inside eSigner instead of cleanly no-op'ing as an unsigned smoke build.
+      HAVE_SIGNING: ${{ secrets.ES_USERNAME != '' && secrets.ES_PASSWORD != '' && secrets.CREDENTIAL_ID != '' && secrets.ES_TOTP_SECRET != '' }}
       # The signer certificate's subject — asserted at verify time so a different
       # (even validly-chained) certificate cannot pass silently. Sourced from the
       # `release` environment variable (this job runs in that environment), so it
