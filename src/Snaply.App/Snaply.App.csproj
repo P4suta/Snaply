@@ -19,6 +19,13 @@
          SDK runtime. Deliberate deviation from the winui skill defaults — do NOT
          "fix" back to packaged/MSIX. -->
     <WindowsPackageType>None</WindowsPackageType>
+    <!-- Bundle the .NET runtime itself (not just the Windows App SDK): a plain
+         `-r win-x64` publish is framework-dependent unless SelfContained is set,
+         which produced a runtimeconfig demanding an installed .NET and the
+         "You must install or update .NET to run this application" error on any
+         machine without the SDK. WindowsAppSDKSelfContained only bundles WinAppSDK,
+         NOT the runtime — both are required for a truly standalone bundle. -->
+    <SelfContained>true</SelfContained>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
