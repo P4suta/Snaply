@@ -13,7 +13,7 @@
 # の版は SDK パッチに追従するため、SDK を固定しないと packages.lock.json が
 # ローカルと CI で食い違い、locked-mode restore が NU1004 で失敗する。
 # 新版が出たら mise-outdated が検知するので、そこで意図的に上げる。
-dotnet = "10.0.300"
+dotnet = "10.0.301"
 # Task runner (justfile): build / run / test / publish の標準レシピを供給。
 # CI からも同じ `just publish` を叩けるようここで宣言（バンドルロジックの二重化回避）。
 just = "1"
