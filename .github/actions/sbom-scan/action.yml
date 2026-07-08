@@ -19,14 +19,19 @@ runs:
         dotnet tool install --global CycloneDX --version 6.2.0
         "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
-    # SBOM (CycloneDX 1.6 JSON) for the App project — its transitive closure
-    # covers Snaply.Core and Snaply.Platform (the shipped code). Generated after
-    # the build so the resolved graph matches what shipped.
+    # SBOM (CycloneDX 1.6 JSON) for the whole shipped closure — the solution with
+    # test projects excluded. This covers BOTH apphosts: the App (WinUI/Win2D) AND
+    # the CLI (System.CommandLine, Spectre.Console, ModelContextProtocol), which the
+    # App's closure alone missed — so osv-scanner and sbom-monitor now gate/watch the
+    # networked MCP surface too. Generated after the build so the graph matches what
+    # shipped. NB: the .NET / ASP.NET Core runtime travels via FrameworkReference (a
+    # shared framework, not a NuGet package), so its version is pinned by the SDK
+    # rather than listed as a NuGet component here — see docs/SUPPLY_CHAIN.md.
     - name: Generate C# SBOM (CycloneDX)
       shell: pwsh
       run: |
         New-Item -ItemType Directory -Force -Path build/sbom | Out-Null
-        dotnet CycloneDX src/Snaply.App/Snaply.App.csproj `
+        dotnet CycloneDX Snaply.slnx --exclude-test-projects `
           --output build/sbom --filename snaply.cdx.json `
           --output-format Json --spec-version 1.6 --runtime win-x64
 
