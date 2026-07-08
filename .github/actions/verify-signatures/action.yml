@@ -31,6 +31,12 @@ runs:
         SIGNER_SUBJECT_CONTAINS: ${{ inputs.signer-subject-contains }}
       run: |
         $ErrorActionPreference = 'Stop'
+        # Fail closed if the identity assertion is empty: an empty substring makes
+        # the -notlike check below "*..*" which matches ANY subject, silently
+        # disabling the wrong-cert defence. Refuse rather than verify without it.
+        if ([string]::IsNullOrWhiteSpace($env:SIGNER_SUBJECT_CONTAINS)) {
+          throw "SIGNER_SUBJECT_CONTAINS is empty - refusing to verify without a signer-identity assertion (set the 'release' environment variable)"
+        }
         $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
           Sort-Object FullName | Select-Object -Last 1
         if (-not $signtool) {
@@ -38,7 +44,12 @@ runs:
             Sort-Object FullName | Select-Object -Last 1
         }
         if (-not $signtool) { throw "signtool.exe not found under the Windows SDK" }
-        $targets = 'Snaply.exe', 'app/Snaply.App.exe'
+        # Verify exactly what was signed: the single source of truth is sign-map.ps1,
+        # so this list can never drift from what the sign job stages (e.g. when a
+        # first-party PE is added). The bundle-relative paths are the map's keys.
+        . "$env:GITHUB_WORKSPACE/scripts/sign-map.ps1"
+        $targets = @($SnaplyFirstPartyPes.Keys)
+        Write-Host "verifying $($targets.Count) first-party PE(s) from sign-map.ps1"
         foreach ($f in $targets) {
           $p = "$env:BUNDLE_DIR/$f"
           & $signtool.FullName verify /pa /tw $p
