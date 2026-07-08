@@ -5,7 +5,12 @@
 # yet. Keep this list short and reviewed — every entry is a deliberate exception
 # to the release gate.
 #
+# Always set `ignoreUntil` (a review date) so an exception can't quietly become
+# permanent: when it lapses, osv-scanner re-surfaces the advisory and forces a
+# re-review (bump the fix landed, or re-justify and extend the date).
+#
 # Example:
 # [[IgnoredVulns]]
 # id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2026-12-31
 # reason = "Not reachable: the vulnerable code path is never exercised by Snaply."
