@@ -34,6 +34,17 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <!-- Don't publish the framework's localized satellite resource assemblies (de/es/fr/…):
+         Snaply's own UI is localized via WinUI MRT (Strings\{lang}\Resources.resw -> the app
+         .pri), a separate mechanism, so English framework resources are enough. Set
+         solution-wide because the self-contained CLI drags in the ASP.NET Core shared
+         framework, whose ~10 hyphen-less locale folders (cs, de, ja, ko, ru…) otherwise ship
+         and bloat the bundle. This is the clean root cause; publish.ps1's locale prune becomes
+         a belt-and-suspenders backstop. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <!-- Maximal analyzer/style strictness: all .NET analyzer rules on, code style
          enforced in the build, and every warning promoted to an error. Security
          rules (CA2100/CA3xxx/CA5xxx) are pinned to error in .editorconfig;
