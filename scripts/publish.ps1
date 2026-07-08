@@ -119,6 +119,23 @@ $required = @((Join-Path $distRoot 'Snaply.exe'), (Join-Path $appDir 'Snaply.App
 $missing = @($required | Where-Object { -not (Test-Path $_) })
 if ($missing.Count -gt 0) { throw "bundle is missing: $($missing -join ', ')" }
 
+# Guard against a framework-dependent publish. A self-contained app's runtimeconfig
+# carries `includedFrameworks` (the .NET runtime travels inside the bundle); a
+# framework-dependent one carries `framework` and dies with "You must install or
+# update .NET to run this application" on any machine without the SDK. This shipped
+# once in v0.1.0 (Snaply.App was missing <SelfContained>true</SelfContained> — only
+# WindowsAppSDKSelfContained was set, which bundles WinAppSDK but not the runtime).
+# Fail the publish here so it can never ship again.
+foreach ($exe in @('Snaply.App', 'snaply')) {
+    $rc = Join-Path $appDir "$exe.runtimeconfig.json"
+    if (-not (Test-Path $rc)) { throw "self-contained check: missing $rc" }
+    $opts = (Get-Content $rc -Raw | ConvertFrom-Json).runtimeOptions
+    if (-not $opts.includedFrameworks) {
+        throw "self-contained check FAILED: $exe.exe is framework-dependent (runtimeconfig has no 'includedFrameworks'). Set <SelfContained>true</SelfContained> in its csproj; otherwise the bundle errors with 'You must install or update .NET' on a clean machine."
+    }
+}
+Write-Host '    self-contained: Snaply.App + CLI carry their own .NET runtime'
+
 Write-Host "==> Bundle ready: $distRoot"
 
 if ($Package) {
