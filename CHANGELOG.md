@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/P4suta/Snaply/compare/v0.1.0...v0.1.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* publish Snaply.App self-contained so the bundle needs no installed .NET ([#19](https://github.com/P4suta/Snaply/issues/19)) ([15cd732](https://github.com/P4suta/Snaply/commit/15cd7323851e70daae9fb7cc577acfef758238ed))
+
 ## 0.1.0 (2026-07-08)
 
 
