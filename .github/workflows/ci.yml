@@ -31,6 +31,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.f.outputs.code }}
+      pkg: ${{ steps.f.outputs.pkg }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
@@ -46,6 +47,26 @@ jobs:
               - 'mise.toml'
               - '**/packages.lock.json'
               - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+            # The release-packaging surface: anything that changes what `just publish`
+            # produces (the bundle, the launcher, the csproj publish props) or how the
+            # release/nightly jobs run. Guards the publish-smoke job so a publish.ps1 /
+            # justfile / csproj change can never merge with zero build (the class of gap
+            # that shipped a framework-dependent v0.1.0 — the App .csproj lacked
+            # <SelfContained>, which a plain `dotnet build` never exercises).
+            pkg:
+              - 'scripts/**'
+              - 'justfile'
+              - '**/*.csproj'
+              - 'Directory.Build.props'
+              - 'mise.toml'
+              - 'Snaply.slnx'
+              # The Native AOT launcher is built ONLY by `just publish` (the windows
+              # job's dotnet build compiles App + CLI, never the launcher), so its
+              # source must trigger the publish smoke or AOT breakage stays hidden.
+              - 'src/Snaply.Launcher/**'
+              - '.github/workflows/release.yml'
+              - '.github/workflows/nightly.yml'
               - '.github/actions/**'
 
   # ── ubuntu hygiene tier: parallel, no needs, cheap fast-fail signal ──
@@ -109,6 +130,25 @@ jobs:
       - name: Format check
         run: mise exec -- dotnet format Snaply.slnx --verify-no-changes --no-restore
 
+  # ── publish smoke: exercise the actual release packaging on PRs ──
+  # A plain `dotnet build` (the windows job) never runs `dotnet publish`, so
+  # self-contained/RID/AOT regressions in the packaging path stay invisible until
+  # nightly or a real release. Run `just publish` here on the packaging surface
+  # (see the `pkg` filter): it assembles the self-contained bundle, builds the
+  # Native AOT launcher, and runs publish.ps1's self-verify (the framework-dependent
+  # guard + bundle-integrity checks). Shift-left for the class of bug that shipped
+  # v0.1.0. No version arg = an unstamped dev bundle; no signing/zip needed here.
+  publish-smoke:
+    needs: [changes]
+    if: needs.changes.outputs.pkg == 'true' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-dotnet-mise
+      - name: Publish smoke (self-contained bundle + AOT launcher + self-verify)
+        run: mise exec -- just publish
+
   pr-title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -153,7 +193,10 @@ jobs:
   # Waiting" deadlock. PR-only: it gates PR merges.
   ci-required:
     if: ${{ always() && github.event_name == 'pull_request' }}
-    needs: [hygiene, core-tests, windows, pr-title, release-gate]
+    # `changes` is included so a failure of the paths-filter itself (which gates
+    # core-tests/windows/publish-smoke) fails the gate instead of silently
+    # skipping everything into a green check.
+    needs: [changes, hygiene, core-tests, windows, publish-smoke, pr-title, release-gate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
