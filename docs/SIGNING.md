@@ -8,14 +8,18 @@ attestations.
 
 ## What gets signed
 
-Only Snaply's own PE files — see `scripts/sign-map.ps1` (the single source of
-truth):
+Every one of Snaply's own PE files — see `scripts/sign-map.ps1` (the single
+source of truth; `verify-signatures` reads the same map so the two never drift):
 
 - `Snaply.exe` — the Native AOT launcher at the bundle root
 - `app/Snaply.App.exe` — the WinUI apphost
+- `app/snaply.exe` — the CLI / MCP-server apphost
+- `app/Snaply.App.dll`, `app/Snaply.Core.dll`, `app/Snaply.Application.dll`,
+  `app/Snaply.Platform.dll` — the first-party managed assemblies (the actual
+  application logic; managed assemblies are PE files and are signed too)
 
-The bundled .NET / Windows App SDK runtime DLLs are already Microsoft-signed and
-are deliberately **not** re-signed.
+The bundled .NET / Windows App SDK / ASP.NET Core runtime DLLs are already
+Microsoft-signed and are deliberately **not** re-signed.
 
 ## Provider: SSL.com eSigner
 
@@ -32,9 +36,11 @@ Configure these secrets in the approval-gated `release` environment:
 | `CREDENTIAL_ID` | the signing credential id |
 | `ES_TOTP_SECRET` | the TOTP secret for automated 2FA |
 
-Also set `SIGNER_SUBJECT_CONTAINS` (in `release.yml`) to a substring of your
-certificate's subject (e.g. `CN=Your Name`); the verify step asserts it so a
-different certificate cannot pass silently.
+Also set `SIGNER_SUBJECT_CONTAINS` (the `release` environment variable) to a
+substring of your certificate's subject (e.g. `CN=Your Name`); the verify step
+asserts it so a different certificate cannot pass silently. It is **required**
+when signing: `verify-signatures` refuses to run (fails closed) if it is empty,
+so the identity assertion can never be silently skipped.
 
 ## The safety net
 
