@@ -71,7 +71,7 @@ sign-collect:
 
 # Generate the CycloneDX SBOM into build/sbom (needs `dotnet tool install -g CycloneDX`).
 sbom:
-    mise exec -- pwsh -NoProfile -Command "New-Item -ItemType Directory -Force build/sbom | Out-Null; dotnet CycloneDX src/Snaply.App/Snaply.App.csproj --output build/sbom --filename snaply.cdx.json --output-format Json --spec-version 1.6 --runtime win-x64"
+    mise exec -- pwsh -NoProfile -Command "New-Item -ItemType Directory -Force build/sbom | Out-Null; dotnet CycloneDX Snaply.slnx --exclude-test-projects --output build/sbom --filename snaply.cdx.json --output-format Json --spec-version 1.6 --runtime win-x64"
 
 # Build + serve the docfx documentation site locally (needs `dotnet tool install -g docfx`).
 docs:

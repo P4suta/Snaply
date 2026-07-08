@@ -147,7 +147,16 @@ if ($Package) {
     if (Test-Path $zip) { Remove-Item -Force $zip }
     Write-Host "==> Zipping bundle contents -> $zipName"
     Compress-Archive -Path (Join-Path $distRoot '*') -DestinationPath $zip
-    $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-    Set-Content -Path (Join-Path $pkgDir 'SHA256SUMS.txt') -Value "$hash  $zipName" -Encoding ascii
+
+    # Checksum every attached release asset, not just the zip: if the SBOM was
+    # generated (build/sbom/, present in the release job), include it so every
+    # download has a manual-verification path, not only the zip.
+    $sumLines = @()
+    $sumLines += "{0}  {1}" -f (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant(), $zipName
+    $sbom = Join-Path $root 'build/sbom/snaply.cdx.json'
+    if (Test-Path $sbom) {
+        $sumLines += "{0}  {1}" -f (Get-FileHash $sbom -Algorithm SHA256).Hash.ToLowerInvariant(), 'snaply.cdx.json'
+    }
+    Set-Content -Path (Join-Path $pkgDir 'SHA256SUMS.txt') -Value $sumLines -Encoding ascii
     Write-Host "==> Package: $zip"
 }

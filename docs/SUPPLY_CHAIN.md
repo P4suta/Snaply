@@ -34,8 +34,12 @@ Token-Permissions check rewards.
 - **OpenSSF Scorecard** (`scorecard.yml`) — weekly posture scan; results feed
   the README badge and the Security tab.
 - **SBOM + osv-scanner** (`sbom-monitor.yml` and the release build) — a
-  CycloneDX SBOM is generated from the resolved graph and scanned for known
-  vulnerabilities.
+  CycloneDX SBOM is generated from the resolved NuGet graph of the whole shipped
+  solution (both apphosts — the WinUI app **and** the CLI/MCP server — with test
+  projects excluded) and scanned for known vulnerabilities. The bundled .NET and
+  ASP.NET Core runtime travel via a shared `FrameworkReference` (pinned by the
+  SDK, not a NuGet package), so their versions aren't listed as SBOM components;
+  they are fixed by the `mise.toml` SDK pin instead.
 
 ## Signed, attested releases
 
