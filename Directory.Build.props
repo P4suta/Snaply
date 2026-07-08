@@ -20,7 +20,7 @@
          automatically by release-please (generic updater targets this property;
          see release-please-config.json). Keep in sync with
          .release-please-manifest.json. -->
-    <Version>0.1.1</Version> <!-- x-release-please-version -->
+    <Version>0.1.0</Version> <!-- x-release-please-version -->
 
   </PropertyGroup>
 
