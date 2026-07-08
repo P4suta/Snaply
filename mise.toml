@@ -1,26 +1,29 @@
-# Snaply — プロジェクトローカルのツールチェーン定義
-# 環境全体が mise + chezmoi 管理のため、本プロジェクトも mise でツールを供給する。
-# mise はこのディレクトリ配下で自動有効化される（`mise install` で導入）。
+# Snaply — project-local toolchain definition.
+# The whole environment is managed by mise + chezmoi, so this project supplies
+# its tools through mise too. mise auto-activates under this directory
+# (install with `mise install`).
 #
-# 注意: グローバル設定 (~/.config/mise/config.toml, chezmoi 管理) は変更しない。
-# ここで pin するのはプロジェクト固有のランタイムのみ。
+# Note: never touch the global config (~/.config/mise/config.toml, chezmoi-managed).
+# Only project-specific runtimes are pinned here.
 
 [tools]
-# .NET SDK — mise の core:dotnet バックエンド（プレビルトDL、VC++ build を伴わない＝
-# グローバルの "Windows で VC++ build を走らせない" 方針に合致）。
-# WinUI 3 / Windows App SDK は net10.0-windows を対象とするため 10 系に固定。
-# パッチまで厳密にピン: Native AOT の暗黙 PackageReference（Microsoft.DotNet.ILCompiler）
-# の版は SDK パッチに追従するため、SDK を固定しないと packages.lock.json が
-# ローカルと CI で食い違い、locked-mode restore が NU1004 で失敗する。
-# 新版が出たら mise-outdated が検知するので、そこで意図的に上げる。
+# .NET SDK — mise's core:dotnet backend (prebuilt download, no VC++ build, which
+# matches the global "never run a VC++ build on Windows" policy).
+# Pinned to the 10.x line because WinUI 3 / Windows App SDK target net10.0-windows.
+# Pinned down to the patch: the Native AOT launcher's implicit PackageReference
+# (Microsoft.DotNet.ILCompiler) tracks the SDK patch, so without a fixed SDK the
+# packages.lock.json diverges between local and CI and locked-mode restore fails
+# with NU1004. When a newer patch ships, mise-outdated flags it and we bump here
+# deliberately.
 dotnet = "10.0.301"
-# Task runner (justfile): build / run / test / publish の標準レシピを供給。
-# CI からも同じ `just publish` を叩けるようここで宣言（バンドルロジックの二重化回避）。
+# Task runner (justfile): supplies the standard build / run / test / publish
+# recipes. Declared here so CI can invoke the same `just publish` (no duplicated
+# bundling logic).
 just = "1"
 
 [settings]
 experimental = true
 
-# WinUI テンプレートは dotnet 導入後に一度だけ:
+# Install the WinUI templates once, after dotnet is available:
 #   mise exec -- dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates
-# winapp CLI は環境に導入済み（mise 管理外）。
+# The winapp CLI is already installed in the environment (outside mise).
