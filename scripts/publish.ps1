@@ -71,18 +71,18 @@ Write-Host '==> Cleaning previous bundle'
 if (Test-Path $distRoot) { Remove-Item -Recurse -Force $distRoot }
 
 Write-Host '==> Publishing app (self-contained) into app/'
-dotnet publish src/Snaply.App/Snaply.App.csproj -c Release -r win-x64 -o $appDir @versionArgs
+dotnet publish src/Snaply.App/Snaply.App.csproj -c Release -r win-x64 -p:Platform=x64 -o $appDir @versionArgs
 if ($LASTEXITCODE -ne 0) { throw "app publish failed ($LASTEXITCODE)" }
 
 # The scriptable CLI + MCP host (snaply.exe) ships in the same app/ folder: it shares the
 # Windows App SDK runtime and the Core/Application/Platform DLLs already there, and carries
 # its own snaply.deps.json / runtimeconfig, so the two apphosts coexist without conflict.
 Write-Host '==> Publishing CLI (self-contained) into app/'
-dotnet publish src/Snaply.Cli/Snaply.Cli.csproj -c Release -r win-x64 -o $appDir @versionArgs
+dotnet publish src/Snaply.Cli/Snaply.Cli.csproj -c Release -r win-x64 -p:Platform=x64 -o $appDir @versionArgs
 if ($LASTEXITCODE -ne 0) { throw "cli publish failed ($LASTEXITCODE)" }
 
 Write-Host '==> Publishing launcher (Native AOT)'
-dotnet publish src/Snaply.Launcher/Snaply.Launcher.csproj -c Release -r win-x64 -o $launcherOut @versionArgs
+dotnet publish src/Snaply.Launcher/Snaply.Launcher.csproj -c Release -r win-x64 -p:Platform=x64 -o $launcherOut @versionArgs
 if ($LASTEXITCODE -ne 0) { throw "launcher publish failed ($LASTEXITCODE)" }
 Copy-Item (Join-Path $launcherOut 'Snaply.Launcher.exe') (Join-Path $distRoot 'Snaply.exe') -Force
 
@@ -136,6 +136,32 @@ foreach ($exe in @('Snaply.App', 'snaply')) {
 }
 Write-Host '    self-contained: Snaply.App + CLI carry their own .NET runtime'
 
+# Shipping-integrity checks beyond mere existence — each catches a way the bundle can be
+# subtly broken yet still "have the exe". SkipBuild runs these too, so a signed bundle is
+# re-gated before packaging.
+# 1) Compiled WinUI XAML: the app .pri + at least one .xbf must reach publish, or the first
+#    window dies with "XAML parsing failed" (see the PublishWinUIXamlArtifacts target).
+if (-not (Test-Path (Join-Path $appDir 'Snaply.App.pri'))) { throw "bundle integrity: app/Snaply.App.pri missing (compiled WinUI resources absent -> XAML parse failure at first window)" }
+if (@(Get-ChildItem -Path $appDir -Recurse -Filter '*.xbf').Count -eq 0) { throw "bundle integrity: no compiled XAML (*.xbf) under app/" }
+# 2) Runtime app icon: AppWindow.SetIcon loads these by real file path, not embedded resource.
+foreach ($icon in @('Assets/AppIcon.ico', 'Assets/AppIcon.png')) {
+    if (-not (Test-Path (Join-Path $appDir $icon))) { throw "bundle integrity: app/$icon missing (taskbar/title-bar icon won't load at runtime)" }
+}
+# 3) The CLI's networked MCP transport (mcp serve --transport http) hosts ASP.NET Core; if the
+#    shared framework didn't self-contain, `mcp serve` dies at runtime. Spot-check representatives.
+foreach ($dll in @('Microsoft.AspNetCore.dll', 'ModelContextProtocol.AspNetCore.dll')) {
+    if (-not (Test-Path (Join-Path $appDir $dll))) { throw "bundle integrity: app/$dll missing (self-contained ASP.NET Core / MCP HTTP transport incomplete)" }
+}
+# 4) Architecture: every first-party exe must be an x64 (AMD64=0x8664) PE — a stray AnyCPU/x86
+#    apphost would fail to load the win-x64 runtime.
+foreach ($exe in @((Join-Path $distRoot 'Snaply.exe'), (Join-Path $appDir 'Snaply.App.exe'), (Join-Path $appDir 'snaply.exe'))) {
+    $bytes = [System.IO.File]::ReadAllBytes($exe)
+    $peOffset = [System.BitConverter]::ToInt32($bytes, 0x3C)
+    $machine = [System.BitConverter]::ToUInt16($bytes, $peOffset + 4)
+    if ($machine -ne 0x8664) { throw "bundle integrity: $([System.IO.Path]::GetFileName($exe)) is not an x64 PE (machine=0x{0:X4})" -f $machine }
+}
+Write-Host '    integrity: WinUI .pri/.xbf, app icon, ASP.NET Core/MCP, x64 apphosts all present'
+
 Write-Host "==> Bundle ready: $distRoot"
 
 if ($Package) {
@@ -145,8 +171,11 @@ if ($Package) {
     $zipName = if ($Version) { "snaply-v$($Version.TrimStart('v'))-win-x64.zip" } else { 'snaply-win-x64.zip' }
     $zip = Join-Path $pkgDir $zipName
     if (Test-Path $zip) { Remove-Item -Force $zip }
-    Write-Host "==> Zipping bundle contents -> $zipName"
-    Compress-Archive -Path (Join-Path $distRoot '*') -DestinationPath $zip
+    Write-Host "==> Zipping bundle -> $zipName"
+    # Archive the Snaply/ folder itself (not just its contents), so extracting the zip drops a
+    # single self-contained `Snaply\` folder rather than scattering Snaply.exe / README.txt /
+    # app\ loose into the user's Downloads.
+    Compress-Archive -Path $distRoot -DestinationPath $zip
 
     # Checksum every attached release asset, not just the zip: if the SBOM was
     # generated (build/sbom/, present in the release job), include it so every
