@@ -1,12 +1,12 @@
 {
   "version": 1,
   "dependencies": {
-    "net10.0": {
+    "net10.0-windows10.0.26100": {
       "Meziantou.Analyzer": {
         "type": "Direct",
         "requested": "[3.*, )",
-        "resolved": "3.0.121",
-        "contentHash": "PKNTmwMdzM0YJ7tAvwzWmlgWhtm8ZOma2eNUqchkbmvWwqC8QXoOzNPKwNHZBtPJpehYb7qu9q/182qg4Fmclw=="
+        "resolved": "3.0.123",
+        "contentHash": "maXbWokGTRWiBGqxxN2J1vEVGHFc6yWSjbyc0KkrJ78PcjkeWm3Y4PrKUH0tMcknpJvQkM4twMKrgSYZmRNbcQ=="
       },
       "Roslynator.Analyzers": {
         "type": "Direct",
