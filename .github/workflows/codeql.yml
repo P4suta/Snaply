@@ -35,7 +35,7 @@ jobs:
       - name: Restore (locked)
         run: mise exec -- dotnet restore Snaply.slnx --locked-mode
 
-      - uses: github/codeql-action/init@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+      - uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           languages: csharp
           build-mode: manual
@@ -43,7 +43,7 @@ jobs:
       - name: build for CodeQL
         run: mise exec -- dotnet build src/Snaply.App/Snaply.App.csproj -c Release -p:Platform=x64 --no-restore
 
-      - uses: github/codeql-action/analyze@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+      - uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           category: "/language:csharp"
 
@@ -57,10 +57,10 @@ jobs:
       contents: read # checkout
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: github/codeql-action/init@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+      - uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           languages: actions
           build-mode: none
-      - uses: github/codeql-action/analyze@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+      - uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           category: "/language:actions"
