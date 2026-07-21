@@ -1,0 +1,15 @@
+commit-msg:
+  commands:
+    # Conventional Commits feed release-please's version + CHANGELOG derivation.
+    # {1} = the commit-message file git hands the commit-msg hook. Do not bypass
+    # with --no-verify.
+    conventional-commit:
+      run: committed --commit-file {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    # Mirrors the crate-ci/typos check in ci.yml (config: _typos.toml) so the
+    # local and CI signals match.
+    typos:
+      run: typos

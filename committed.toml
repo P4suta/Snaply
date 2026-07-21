@@ -1,0 +1,34 @@
+# Conventional Commits enforcement for the lefthook commit-msg hook.
+# Keeps the input to release-please's version + CHANGELOG derivation well-formed.
+# The PR-title gate is the authoritative check for squash-merged PRs; this is the
+# earlier, local signal.
+#
+# Only the conventional style is enforced; committed skips fixup!/merge commits by
+# default, so `git rebase --autosquash` and the occasional merge still work.
+style = "conventional"
+# The repo uses lowercase subjects (`feat(x): add y`), matching the PR-title gate
+# (amannn/action-semantic-pull-request defaults to a no-leading-uppercase subject)
+# and the existing git history. committed defaults to requiring capitalization, so
+# turn that off to keep the local hook and the CI gate consistent.
+subject_capitalized = false
+# Enforce the conventional *format*, not arbitrary length: the repo's commits come
+# from squash-merged PR titles (60–100 chars) and the PR-title gate imposes no
+# length limit, so disable committed's 50/72 defaults to stay consistent.
+subject_length = 0
+line_length = 0
+# Match the types CONTRIBUTING.md documents (and the PR-title gate accepts).
+# committed's default set omits ci/build/deps/revert, which the repo uses.
+allowed_types = [
+  "feat",
+  "fix",
+  "perf",
+  "docs",
+  "refactor",
+  "test",
+  "chore",
+  "ci",
+  "build",
+  "deps",
+  "style",
+  "revert",
+]
