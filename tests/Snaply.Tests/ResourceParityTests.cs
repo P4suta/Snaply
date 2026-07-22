@@ -69,9 +69,12 @@ public sealed class ResourceParityTests
             .ToArray();
         Assert.Empty(fixedWidthHosts);
 
-        XElement commandBar = Assert.Single(
+        // The floating command pill must let its label grow (no fixed width), so an expanded
+        // localized capture label reflows the pill instead of being clipped.
+        XElement captureButton = Assert.Single(
             page.Descendants(),
-            element => element.Name.LocalName == "CommandBar");
-        Assert.Equal("True", (string?)commandBar.Attribute("IsDynamicOverflowEnabled"));
+            element => element.Name.LocalName == "SplitButton"
+                && (string?)element.Attribute("{http://schemas.microsoft.com/winfx/2006/xaml}Name") == "CaptureButton");
+        Assert.Null(captureButton.Attribute("Width"));
     }
 }
