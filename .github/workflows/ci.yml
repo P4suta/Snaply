@@ -46,10 +46,13 @@ jobs:
           cache-dependency-path: "**/packages.lock.json"
       - name: Restore locked dependencies
         run: dotnet restore Snaply.slnx --locked-mode
+      # Clear PathMap for this coverage build only: CI's PathMap (/_/) otherwise breaks
+      # coverlet's source resolution and makes it report 0% line coverage.
       - name: Test imaging
         run: >-
           dotnet test tests/Snaply.Tests/Snaply.Tests.csproj
           -c Release --no-restore
+          -p:PathMap=
           --collect:"XPlat Code Coverage"
           --logger "trx;LogFileName=results.trx"
           --results-directory artifacts/test
