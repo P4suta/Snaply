@@ -330,9 +330,12 @@ function Build-Release {
     Reset-Directory $output
     Push-Location $root
     try {
+        # Restore with ReadyToRun on so the crossgen2 runtime pack is fetched here; the per-arch
+        # publishes below run --no-restore, so without it R2R optimization fails (NETSDK1094).
         Invoke-Checked 'dotnet' @(
             'restore',
             'src/Snaply.App/Snaply.App.csproj',
+            '-p:PublishReadyToRun=true',
             '--locked-mode')
         $licenseInventory = Join-Path $output 'dependency-licenses.txt'
         Write-LicenseInventory $licenseInventory
