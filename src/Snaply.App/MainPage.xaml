@@ -71,7 +71,7 @@
                         <SplitButton
                             x:Name="CaptureButton"
                             AutomationProperties.AutomationId="CaptureButton"
-                            Click="CaptureButton_Click">
+                            Command="{x:Bind ViewModel.CaptureCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
                                 <FontIcon
                                     x:Name="PrimaryCaptureGlyph"
@@ -164,7 +164,7 @@
                         Height="{StaticResource ProgressRingSize}"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                        IsActive="{x:Bind ViewModel.CaptureCommand.IsRunning, Mode=OneWay}" />
                 </Grid>
             </Grid>
         </Border>

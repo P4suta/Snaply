@@ -710,7 +710,11 @@ Test-Ui 'Interactive controls expose UI Automation identity' {
         (-not $_.automationId -or -not $_.name)
     })
     if ($missing.Count -ne 0) {
-        throw (($missing | ForEach-Object name) -join ', ')
+        # Reporting the name is useless here — a missing name is exactly what this
+        # catches, so the message came out empty. Identify the element instead.
+        throw (($missing | ForEach-Object {
+                    "$($_.type) automationId='$($_.automationId)' name='$($_.name)'"
+                }) -join '; ')
     }
 }
 

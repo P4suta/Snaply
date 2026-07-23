@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Serilog;
 using Windows.Graphics.Imaging;
@@ -16,8 +17,9 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     internal partial WriteableBitmap? Preview { get; set; }
 
+    // The capture pill picks the mode; CaptureCommand runs whatever is selected.
     [ObservableProperty]
-    internal partial bool IsBusy { get; set; }
+    internal partial CaptureMode SelectedMode { get; set; } = CaptureMode.Desktop;
 
     [ObservableProperty]
     internal partial bool HasImage { get; set; }
@@ -41,24 +43,19 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
         _export = export;
     }
 
-    internal CaptureMode LastCaptureMode { get; private set; } = CaptureMode.Region;
-
-    internal async Task CaptureAsync(CaptureMode mode)
+    // AsyncRelayCommand refuses to run while an execution is in flight and reports that
+    // through CanExecute, so the bound pill disables itself for the duration and the view
+    // needs no separate busy flag or re-entrancy guard.
+    [RelayCommand]
+    private async Task CaptureAsync()
     {
-        if (IsBusy)
-        {
-            return;
-        }
-
-        LastCaptureMode = mode;
         HasError = false;
-        IsBusy = true;
         using var operation = new CancellationTokenSource();
         _operation = operation;
 
         try
         {
-            using CapturedFrame? frame = await _capture.CaptureAsync(mode, operation.Token);
+            using CapturedFrame? frame = await _capture.CaptureAsync(SelectedMode, operation.Token);
             if (frame is null)
             {
                 return;
@@ -92,8 +89,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
             {
                 _operation = null;
             }
-
-            IsBusy = false;
         }
     }
 
