@@ -2,41 +2,15 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
-  <data name="CaptureButton.Content" xml:space="preserve"><value>捕获区域</value></data>
-  <data name="CaptureButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>捕获屏幕截图</value></data>
   <data name="CaptureRegion" xml:space="preserve"><value>捕获区域</value></data>
   <data name="CaptureWindow" xml:space="preserve"><value>捕获窗口</value></data>
   <data name="CaptureDesktop" xml:space="preserve"><value>捕获桌面</value></data>
   <data name="RegionCaptureItem.Text" xml:space="preserve"><value>区域</value></data>
   <data name="WindowCaptureItem.Text" xml:space="preserve"><value>窗口</value></data>
   <data name="DesktopCaptureItem.Text" xml:space="preserve"><value>整个桌面</value></data>
-  <data name="CopyButton.Label" xml:space="preserve"><value>复制</value></data>
-  <data name="SaveAsButton.Label" xml:space="preserve"><value>另存为</value></data>
-  <data name="OpenFolderButton.Label" xml:space="preserve"><value>打开文件夹</value></data>
-  <data name="FitButton.Label" xml:space="preserve"><value>适应</value></data>
-  <data name="ActualSizeButton.Label" xml:space="preserve"><value>100%</value></data>
-  <data name="PreviewScroller.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>屏幕截图预览区域</value></data>
+  <data name="OpenFolderLabel" xml:space="preserve"><value>打开文件夹</value></data>
   <data name="PreviewImage.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>美化后的屏幕截图预览</value></data>
-  <data name="StatusText.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>捕获状态</value></data>
-  <data name="BusyIndicator.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>正在捕获</value></data>
-  <data name="EmptyStateTitle.Text" xml:space="preserve"><value>捕获屏幕截图</value></data>
-  <data name="EmptyStateBody.Text" xml:space="preserve"><value>选择区域、窗口或整个虚拟桌面。</value></data>
-  <data name="SaveAsCommit" xml:space="preserve"><value>保存</value></data>
-  <data name="PngFiles" xml:space="preserve"><value>PNG图像</value></data>
-  <data name="StatusReady" xml:space="preserve"><value>已就绪。</value></data>
-  <data name="StatusCapturingRegion" xml:space="preserve"><value>请选择区域。</value></data>
-  <data name="StatusCapturingWindow" xml:space="preserve"><value>请选择窗口或显示器。</value></data>
-  <data name="StatusCapturingDesktop" xml:space="preserve"><value>正在捕获桌面。</value></data>
-  <data name="StatusSavedCopied" xml:space="preserve"><value>已保存到 Pictures\Screenshots\Snaply 并复制。</value></data>
-  <data name="StatusSavedOnly" xml:space="preserve"><value>已保存，但复制失败。可以重新复制。</value></data>
-  <data name="StatusCopiedOnly" xml:space="preserve"><value>已复制，但自动保存失败。可以使用另存为。</value></data>
-  <data name="StatusExportFailed" xml:space="preserve"><value>预览已就绪。自动保存和复制失败，但都可以重试。</value></data>
-  <data name="StatusCopied" xml:space="preserve"><value>已复制。</value></data>
-  <data name="StatusSaved" xml:space="preserve"><value>已保存。</value></data>
-  <data name="StatusCancelled" xml:space="preserve"><value>已取消捕获。</value></data>
   <data name="ErrorCapture" xml:space="preserve"><value>无法捕获所选内容。</value></data>
-  <data name="ErrorClipboard" xml:space="preserve"><value>无法复制屏幕截图。</value></data>
-  <data name="ErrorSave" xml:space="preserve"><value>无法保存屏幕截图。</value></data>
   <data name="ErrorOpenFolder" xml:space="preserve"><value>无法打开屏幕截图文件夹。</value></data>
   <data name="RegionHint" xml:space="preserve"><value>拖动以选择 · Esc取消</value></data>
   <data name="RegionCancel" xml:space="preserve"><value>取消</value></data>
