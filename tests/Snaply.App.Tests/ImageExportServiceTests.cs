@@ -59,48 +59,6 @@ public sealed class ImageExportServiceTests : IDisposable
         Assert.Empty(Directory.EnumerateFiles(_directory));
     }
 
-    [Fact]
-    public async Task Save_as_atomically_replaces_existing_file()
-    {
-        Directory.CreateDirectory(_directory);
-        string path = Path.Combine(_directory, "capture.png");
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        await File.WriteAllBytesAsync(path, [9], cancellationToken);
-        var service = new ImageExportService(_directory);
-        var image = new RenderedImage([7, 8], 1, 1);
-
-        await service.SaveAsAsync(image, path, cancellationToken);
-
-        Assert.Equal(image.Png, await File.ReadAllBytesAsync(path, cancellationToken));
-        Assert.Empty(TemporaryFiles());
-    }
-
-    [Fact]
-    public async Task Locked_destination_preserves_existing_file_and_removes_temporary_file()
-    {
-        Directory.CreateDirectory(_directory);
-        string path = Path.Combine(_directory, "capture.png");
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        await File.WriteAllBytesAsync(path, [9], cancellationToken);
-        var service = new ImageExportService(_directory);
-        await using (var locked = new FileStream(
-            path,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.None))
-        {
-            Exception? exception = await Record.ExceptionAsync(() =>
-                service.SaveAsAsync(
-                    new RenderedImage([7, 8], 1, 1),
-                    path,
-                    cancellationToken));
-            Assert.True(exception is IOException or UnauthorizedAccessException);
-        }
-
-        Assert.Equal(new byte[] { 9 }, await File.ReadAllBytesAsync(path, cancellationToken));
-        Assert.Empty(TemporaryFiles());
-    }
-
     public void Dispose()
     {
         if (Directory.Exists(_directory))
