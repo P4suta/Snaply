@@ -41,7 +41,9 @@ jobs:
       - uses: microsoft/setup-WinAppCli@b93bbddc1f7abc061ca0d3a8119e3a0c7dd71495
         with:
           version: v0.3.1
-      - run: dotnet restore Snaply.slnx --locked-mode
+      # Restore with ReadyToRun on so the crossgen2 runtime pack is fetched here; the
+      # publish below runs --no-restore, so without it R2R fails (NETSDK1094).
+      - run: dotnet restore Snaply.slnx --locked-mode -p:PublishReadyToRun=true
       - run: dotnet test tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore
       - if: matrix.architecture == 'x64'
         run: dotnet test tests/Snaply.App.Tests/Snaply.App.Tests.csproj -c Release --no-restore
@@ -93,6 +95,14 @@ jobs:
               Stop-Process -Id $process.Id -Force
             }
           }
+      # Only reached when the UI journeys and the soak both passed, so the payload
+      # published here is one that survived every nightly gate.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-${{ matrix.architecture }}
+          path: build/native
+          retention-days: 14
+          if-no-files-found: error
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
