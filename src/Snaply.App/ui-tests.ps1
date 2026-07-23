@@ -438,6 +438,12 @@ function Invoke-CaptureMode {
             $item = Wait-ProcessElement $AutomationId 2000
             $item.GetCurrentPattern(
                 [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            # The flyout item only selects the mode — the pill body is what runs the
+            # capture (MainPage.xaml.cs: RegionCaptureItem_Click -> SelectMode, capture
+            # happens in CaptureButton_Click). Invoking the item alone starts nothing.
+            $capture = Wait-AppElement CaptureButton IsEnabled $true 5000
+            $capture.GetCurrentPattern(
+                [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
             return
         }
         catch {
