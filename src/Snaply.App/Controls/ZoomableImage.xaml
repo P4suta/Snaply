@@ -26,7 +26,7 @@
               tightly (no letterbox), which keeps panning symmetric on both axes.  -->
         <Image
             x:Name="DisplayImage"
-            x:Uid="PreviewImageA11y"
+            x:Uid="PreviewImage"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
             AutomationProperties.AutomationId="PreviewImage"

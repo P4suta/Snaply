@@ -1,168 +1,57 @@
-# Snaply — editor + analyzer conventions (convention hardening).
-#
-# Directory.Build.props turns on EnableNETAnalyzers + AnalysisMode=All +
-# EnforceCodeStyleInBuild + TreatWarningsAsErrors for every project, so the .NET
-# analyzers (CAxxxx) and Roslynator (RCSxxxx) carry the bulk of the strictness.
-# This file pins the canonical style, forces the security category to error
-# regardless of mode, and exempts generated WinUI XAML code.
 root = true
 
 [*]
 charset = utf-8
+end_of_line = crlf
 indent_style = space
 insert_final_newline = true
 trim_trailing_whitespace = true
 
 [*.{cs,csx}]
 indent_size = 4
-end_of_line = crlf
-
-# ── Canonical C# style (matches the existing codebase: file-scoped namespaces,
-#    usings outside the namespace, modern C#). Kept at suggestion so enabling the
-#    gate does not force a one-shot reformat; the substantive strictness is the
-#    CA/RCS analyzers below.
-csharp_style_namespace_declarations = file_scoped:suggestion
-csharp_using_directive_placement = outside_namespace:suggestion
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+csharp_prefer_braces = true:warning
 dotnet_sort_system_directives_first = true
-csharp_prefer_braces = true:suggestion
-csharp_style_var_for_built_in_types = false:suggestion
-csharp_style_var_when_type_is_apparent = true:suggestion
-dotnet_style_qualification_for_field = false:suggestion
-dotnet_style_qualification_for_property = false:suggestion
-csharp_style_expression_bodied_methods = true:silent
-dotnet_style_readonly_field = true:suggestion
-dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggestion
-
-# Unused usings, enforced in the build (Directory.Build.props sets
-# GenerateDocumentationFile so this works; that also turns on CS1591 — every
-# public member gets an XML doc).
-dotnet_diagnostic.IDE0005.severity = warning
-
-# ── Security analyzers: non-negotiable, pinned to error regardless of mode.
-dotnet_diagnostic.CA2100.severity = error  # SQL injection via string concat
-dotnet_diagnostic.CA2109.severity = error  # visible event handlers
-dotnet_diagnostic.CA3003.severity = error  # file-path injection
-dotnet_diagnostic.CA3006.severity = error  # process command injection
-dotnet_diagnostic.CA3075.severity = error  # insecure DTD/XXE
-dotnet_diagnostic.CA5350.severity = error  # weak crypto algorithm
-dotnet_diagnostic.CA5351.severity = error  # broken crypto algorithm
-dotnet_diagnostic.CA5392.severity = error  # P/Invoke needs DefaultDllImportSearchPaths
-dotnet_diagnostic.CA5394.severity = error  # insecure randomness (review-and-justify)
-
-# ── Rules that do not fit an internal WinUI app (this is an application, not a
-#    published library; it is UI-thread bound; and its error-handling ethos keeps
-#    the UI alive). Relaxed with a reason, never blanket-off.
-# WinUI/XAML needs public pages, viewmodels and x:Bind targets — cannot be internal.
-dotnet_diagnostic.CA1515.severity = none
-# ConfigureAwait(false) would resume off the dispatcher in a UI app.
+dotnet_style_readonly_field = true:warning
+dotnet_style_require_accessibility_modifiers = always:warning
+dotnet_diagnostic.IDE0005.severity = suggestion
+dotnet_diagnostic.CA1515.severity = warning
 dotnet_diagnostic.CA2007.severity = none
-# Nullable reference types already enforce non-null at the public boundary.
-dotnet_diagnostic.CA1062.severity = none
-# Deliberate catch-all keeps the UI alive; caught exceptions are surfaced/logged,
-# not silently swallowed.
-dotnet_diagnostic.CA1031.severity = none
-# Internal app surface — the library-API design rules below do not apply:
-dotnet_diagnostic.CA1002.severity = none   # List<T> in signatures
-dotnet_diagnostic.CA2227.severity = none   # collection-property setters
-dotnet_diagnostic.CA1819.severity = none   # array-typed properties
-dotnet_diagnostic.CA1003.severity = none   # EventHandler<T> shape
-dotnet_diagnostic.CA1032.severity = none   # full exception-constructor set
-dotnet_diagnostic.RCS1194.severity = none  # (Roslynator's CA1032 equivalent)
-# Cross-language (VB) naming guard — Snaply is a C# app, not a VB-consumable
-# library; `Error` is the domain name for a structured failure (Result.cs).
-dotnet_diagnostic.CA1716.severity = none
-# Static factory members on the generic Result<T> (Ok/Fail) are the idiomatic
-# Result-monad shape; moving them off the generic type would only obfuscate call sites.
-dotnet_diagnostic.CA1000.severity = none
-# Closed union cases are deliberately nested under their parent (Background.Solid /
-# .LinearGradient / .ImageFile) so the discriminated-union hierarchy reads as one unit.
-dotnet_diagnostic.CA1034.severity = none
+dotnet_diagnostic.CA5392.severity = error
 
-# ── StyleCop (SAxxxx): keep the layout/ordering/spacing rules, but turn off the
-#    ones that fight the deliberate house style (decisions, not laziness).
-dotnet_diagnostic.SA1101.severity = none  # `this.` prefix — codebase omits it (qualification = false)
-dotnet_diagnostic.SA1309.severity = none  # _camelCase private fields (MVVM [ObservableProperty])
-# P/Invoke interop structs (WNDCLASS, MSG, RECT, MONITORINFO…) deliberately mirror
-# the native Win32 field names (left/top/lpfnWndProc…) so the layout maps 1:1 to the
-# headers; forcing PascalCase would obscure the correspondence. Applies to the
-# public fields of those structs.
-dotnet_diagnostic.SA1307.severity = none
-dotnet_diagnostic.SA1200.severity = none  # usings outside the namespace (canonical style above)
-dotnet_diagnostic.SA1633.severity = none  # no per-file license header
-dotnet_diagnostic.SA1623.severity = none  # property doc need not start "Gets or sets"
-dotnet_diagnostic.SA1642.severity = none  # ctor doc need not start "Initializes a new instance"
-dotnet_diagnostic.SA1643.severity = none  # likewise destructors
-dotnet_diagnostic.SA1629.severity = none  # doc sentences need not end with a period
-# CS1591 owns the "public members are documented" gate; SA's doc-presence rules would
-# also demand docs on internal/private/enum members — out of scope here.
-dotnet_diagnostic.SA1600.severity = none
-dotnet_diagnostic.SA1601.severity = none
-dotnet_diagnostic.SA1602.severity = none
-# Member ordering: not retrofitting the existing layout of every file.
-dotnet_diagnostic.SA1201.severity = none
-dotnet_diagnostic.SA1202.severity = none
-dotnet_diagnostic.SA1204.severity = none
-# One-type-per-file / filename-matches-type: Snaply deliberately groups cohesive
-# domain types in one file — the Result monad (Error + Result + Result<T>), the
-# beautify discriminated union (Background + its cases, Padding, ShadowSpec…), the
-# geometry value types. Same "not retrofitting the deliberate house layout"
-# rationale as the member-ordering rules above; MA0048 (below) is the duplicate.
-dotnet_diagnostic.SA1402.severity = none
-dotnet_diagnostic.SA1649.severity = none
-
-# ── Meziantou (MAxxxx): keep the correctness rules; turn off the ones that mirror
-#    library-API CA rules already relaxed above, or duplicate a StyleCop rule.
-dotnet_diagnostic.MA0004.severity = none  # ConfigureAwait — UI app resumes on the dispatcher (mirrors CA2007)
-dotnet_diagnostic.MA0046.severity = none  # EventHandler<T> delegate shape (mirrors CA1003)
-dotnet_diagnostic.MA0016.severity = none  # collection abstraction in signatures (mirrors CA1002/CA1819)
-dotnet_diagnostic.MA0051.severity = none  # method length — an arbitrary threshold
-dotnet_diagnostic.MA0048.severity = none  # file name vs type — same grouped-domain-types decision as SA1649
-# Explicit [StructLayout] on domain value structs (Rgba, Dpi, PhysicalRect,
-# Padding…) is a noisy interop micro-opinion; these never cross a P/Invoke boundary.
-dotnet_diagnostic.MA0008.severity = none
-
-# ── Generated WinUI XAML code (InitializeComponent etc.) is not ours to lint.
 [*.g.cs]
 generated_code = true
-dotnet_diagnostic.CS1591.severity = none
-dotnet_diagnostic.CA1591.severity = none
 
 [*.g.i.cs]
 generated_code = true
 
-[*.Designer.cs]
-generated_code = true
-
-# Anything under obj/ (XAML .g.cs, AssemblyInfo, RESW accessors, etc.) is generated.
 [obj/**]
 generated_code = true
 
-# Windows App SDK ships auto-initializer .cs files (bootstrap + undocked reg-free WinRT)
-# that it compiles into self-contained unpackaged Exes. They are SDK-generated, not ours,
-# so they must not be held to our analyzer bar (e.g. CA5392 on their P/Invokes).
 [*-AutoInitializer.cs]
 generated_code = true
 
-# ── Tests: xunit/test idioms trip a few design/naming rules that do not apply.
-[tests/Snaply.Tests/**.cs]
-# Test code uses idioms the app/library rules flag; relaxed for tests only.
-dotnet_diagnostic.CA1707.severity = none   # underscores in test method names
-dotnet_diagnostic.CA1591.severity = none   # no XML docs required on test members
-dotnet_diagnostic.CA2000.severity = none   # short-lived test fixtures / disposables
-dotnet_diagnostic.CA2213.severity = none   # test fixture disposables (xunit tears down)
-dotnet_diagnostic.CA1001.severity = none   # test fixtures owning disposables
-dotnet_diagnostic.CA1034.severity = none   # nested test-helper types
-dotnet_diagnostic.CA1030.severity = none   # test-double event-ish method names
-dotnet_diagnostic.CA1849.severity = none   # sync calls inside async test bodies
-dotnet_diagnostic.CA1307.severity = none   # string ops in test assertions
-dotnet_diagnostic.CA1305.severity = none   # culture in test-only formatting
-dotnet_diagnostic.RCS1210.severity = none  # Roslynator return-pattern in test helpers
-# Test infrastructure carries no API docs (mirrors CA1591 above), so the StyleCop
-# parameter/return doc rules do not apply either.
-dotnet_diagnostic.SA1611.severity = none   # parameter docs
-dotnet_diagnostic.SA1614.severity = none   # param doc text
-dotnet_diagnostic.SA1615.severity = none   # return value documented
-dotnet_diagnostic.SA1616.severity = none   # return doc text
-dotnet_diagnostic.SA1618.severity = none   # type-parameter docs
-dotnet_diagnostic.SA1651.severity = none   # placeholder doc elements
-dotnet_diagnostic.CS1591.severity = none   # public test members need no XML docs
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA2000.severity = none
+dotnet_diagnostic.CA1062.severity = none
+
+[src/Snaply.App/App.xaml.cs]
+dotnet_diagnostic.CA1515.severity = none
+
+[src/Snaply.App/MainWindow.xaml.cs]
+dotnet_diagnostic.CA1515.severity = none
+
+[src/Snaply.App/MainPage.xaml.cs]
+dotnet_diagnostic.CA1515.severity = none
+
+[src/Snaply.App/ViewModels/MainViewModel.cs]
+dotnet_diagnostic.CA1031.severity = none
+
+[src/Snaply.App/ImageExportService.cs]
+dotnet_diagnostic.CA1849.severity = none
+
+[src/Snaply.App/ScreenCaptureService.cs]
+dotnet_diagnostic.CA2000.severity = none

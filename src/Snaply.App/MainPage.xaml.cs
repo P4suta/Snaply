@@ -1,119 +1,106 @@
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Snaply.Core.Geometry;
-using Snaply.Core.Ports;
-using Snaply.Services;
-using Snaply.ViewModels;
-using Windows.ApplicationModel.DataTransfer;
+using Microsoft.UI.Xaml.Input;
+using Windows.System;
 
 namespace Snaply;
 
-/// <summary>
-/// The main content page. Resolves the shared <see cref="MainViewModel"/> from the
-/// composition root, adapts the beautified <c>CapturedImage</c> to the preview
-/// <see cref="Image"/>, and supplies the region-overlay + save-dialog hooks the
-/// ViewModel invokes (keeping WinUI types out of the ViewModel).
-/// </summary>
 public sealed partial class MainPage : Page
 {
-    // WDA_EXCLUDEFROMCAPTURE keeps Snaply out of every capture API (WGC included) while it stays
-    // visible on the monitor — deterministic, no hiding/timing. Always on: Snaply never appears
-    // in its own shots.
-    private const uint WdaExcludeFromCapture = 0x00000011;
+    // Segoe Fluent Icons glyph code points for the Capture pill, per selected mode.
+    private const int RegionGlyph = 0xEF20;
+    private const int WindowGlyph = 0xE737;
+    private const int DesktopGlyph = 0xE7F4;
 
-    /// <summary>The shared view model that drives this page (bound via x:Bind).</summary>
-    public MainViewModel ViewModel { get; }
+    private bool _acceleratorsInstalled;
 
-    /// <summary>Resolves the view model and wires up the page.</summary>
-    public MainPage()
+    // The mode the Capture pill runs. The flyout only changes this (it never captures on its own);
+    // pressing the pill body captures with it. Defaults to the whole desktop.
+    private CaptureMode _selectedMode = CaptureMode.Desktop;
+
+    internal MainPage(MainViewModel viewModel)
     {
-        ViewModel = App.Services.GetRequiredService<MainViewModel>();
-
+        ViewModel = viewModel;
         InitializeComponent();
-
-        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
-        ViewModel.RegionSelector = PickRegionAsync;
-        ViewModel.WindowSelector = PickWindowAsync;
-
-        Loaded += OnLoaded;
-    }
-
-    private void OnLoaded(object sender, RoutedEventArgs e) =>
-        ApplyCaptureExclusion(); // the window handle is valid once loaded
-
-    private void OnCopyErrorDetailClick(object sender, RoutedEventArgs e)
-    {
-        try
+        UpdatePrimaryCapture();
+        ViewModel.PropertyChanged += (_, args) =>
         {
-            var package = new DataPackage();
-            package.SetText(ViewModel.ErrorDetail);
-            Clipboard.SetContent(package);
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
-        {
-            // Copying the diagnostic text is a convenience; the detail is still on screen.
-        }
-    }
-
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (string.Equals(e.PropertyName, nameof(MainViewModel.BeautifiedImage), StringComparison.Ordinal))
-        {
-            PreviewImageControl.Source = ViewModel.BeautifiedImage is null
-                ? null
-                : ImageBridge.ToWriteableBitmap(ViewModel.BeautifiedImage);
-        }
-        else if (string.Equals(e.PropertyName, nameof(MainViewModel.SavedTick), StringComparison.Ordinal))
-        {
-            // Auto-save just landed: flip the folder icon to a green check and back.
-            SavedFeedback.Begin();
-        }
-    }
-
-    // Reveal the last saved capture in Explorer (file selected), or just open the captures
-    // folder if nothing has been saved yet. Best-effort convenience.
-    private void OnOpenFolderClick(object sender, RoutedEventArgs e)
-    {
-        string path = ViewModel.LastSavedPath;
-        string args = string.IsNullOrEmpty(path)
-            ? $"\"{AppPaths.Ensure(AppPaths.CapturesDirectory)}\""
-            : $"/select,\"{path}\"";
-
-        try
-        {
-            using (Process.Start("explorer.exe", args))
+            // Each successful auto-save bumps SavedTick; play the folder→green-check flip.
+            if (args.PropertyName == nameof(MainViewModel.SavedTick))
             {
+                DispatcherQueue.TryEnqueue(() => SavedFeedback.Begin());
             }
-        }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+        };
+        Loaded += (_, _) => InstallAccelerators();
+    }
+
+    internal MainViewModel ViewModel { get; }
+
+    // Capture pill body: run the currently selected mode.
+    private async void CaptureButton_Click(SplitButton sender, SplitButtonClickEventArgs args) =>
+        await ViewModel.CaptureAsync(_selectedMode);
+
+    // Flyout items: change the selected mode only (the capture happens on the pill body click).
+    private void RegionCaptureItem_Click(object sender, RoutedEventArgs args) => SelectMode(CaptureMode.Region);
+
+    private void WindowCaptureItem_Click(object sender, RoutedEventArgs args) => SelectMode(CaptureMode.Window);
+
+    private void DesktopCaptureItem_Click(object sender, RoutedEventArgs args) => SelectMode(CaptureMode.Desktop);
+
+    private void OpenFolderButton_Click(object sender, RoutedEventArgs args) => ViewModel.OpenFolder();
+
+    private void SelectMode(CaptureMode mode)
+    {
+        _selectedMode = mode;
+        UpdatePrimaryCapture();
+    }
+
+    // Reflect the selected mode on the Capture pill (label + glyph). Kept in code-behind so the
+    // view model stays free of presentation strings.
+    private void UpdatePrimaryCapture()
+    {
+        PrimaryCaptureLabel.Text = ResourceText.Get(_selectedMode switch
         {
-            // Opening Explorer is best-effort; the file is already saved.
+            CaptureMode.Region => "CaptureRegion",
+            CaptureMode.Window => "CaptureWindow",
+            _ => "CaptureDesktop",
+        });
+        PrimaryCaptureGlyph.Glyph = char.ConvertFromUtf32(_selectedMode switch
+        {
+            CaptureMode.Region => RegionGlyph,
+            CaptureMode.Window => WindowGlyph,
+            _ => DesktopGlyph,
+        });
+    }
+
+    private void InstallAccelerators()
+    {
+        if (_acceleratorsInstalled)
+        {
+            return;
         }
+
+        _acceleratorsInstalled = true;
+        KeyboardAccelerators.Add(CreateAccelerator(VirtualKey.N, VirtualKeyModifiers.Control, async () =>
+            await ViewModel.CaptureAsync(_selectedMode)));
+        KeyboardAccelerators.Add(CreateAccelerator(VirtualKey.Escape, VirtualKeyModifiers.None, () =>
+        {
+            ViewModel.Cancel();
+            return Task.CompletedTask;
+        }));
     }
 
-    private async Task<PhysicalRect?> PickRegionAsync()
+    private static KeyboardAccelerator CreateAccelerator(
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        Func<Task> action)
     {
-        IScreenCaptureService capture = App.Services.GetRequiredService<IScreenCaptureService>();
-        var overlay = new RegionOverlayWindow();
-        return await overlay.PickRegionAsync(capture);
+        var accelerator = new KeyboardAccelerator { Key = key, Modifiers = modifiers };
+        accelerator.Invoked += async (_, args) =>
+        {
+            args.Handled = true;
+            await action();
+        };
+        return accelerator;
     }
-
-    private async Task<nint?> PickWindowAsync()
-    {
-        IWindowEnumerationService enumerator = App.Services.GetRequiredService<IWindowEnumerationService>();
-        IScreenCaptureService capture = App.Services.GetRequiredService<IScreenCaptureService>();
-        var overlay = new WindowPickerOverlay();
-        return await overlay.PickWindowAsync(enumerator, capture);
-    }
-
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SetWindowDisplayAffinity(nint hWnd, uint dwAffinity);
-
-    private static void ApplyCaptureExclusion() =>
-        _ = SetWindowDisplayAffinity(App.WindowHandle, WdaExcludeFromCapture);
 }

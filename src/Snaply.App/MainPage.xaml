@@ -1,12 +1,13 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="Snaply.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ctrl="using:Snaply.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:local="using:Snaply"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="720"
+    d:DesignWidth="1100"
     HighContrastAdjustment="None"
     mc:Ignorable="d">
 
@@ -56,133 +57,118 @@
                 <!--  The captured image shares the ambient's exact region (fills the whole card) so
                       zoom/pan crops at the card edge, never at an inset. It still reads as floating:
                       it's lifted with a drop shadow and the ambient shows through around it.  -->
-                <ctrl:ZoomableImage x:Name="PreviewImageControl" />
+                <ctrl:ZoomableImage
+                    x:Name="PreviewImageControl"
+                    Source="{x:Bind ViewModel.Preview, Mode=OneWay}" />
 
                 <!--  Only the floating UI (pills, error banner, progress) is inset from the card edge.  -->
                 <Grid Padding="{StaticResource PreviewSurfacePadding}">
 
-                <!--  Command pill, top-left: re-capture from here. Persistent so the shell is identical
-                      before and after the first capture (the empty canvas is the ambient backdrop).  -->
-                <Border
-                    x:Name="CommandBar"
-                    Margin="{StaticResource FloatingToolbarMargin}"
-                    HorizontalAlignment="Left"
-                    VerticalAlignment="Top"
-                    Style="{StaticResource FloatingToolbarStyle}">
-                    <SplitButton
-                        x:Name="PrimaryCaptureButton"
-                        AutomationProperties.AutomationId="PrimaryCaptureButton"
-                        Command="{x:Bind ViewModel.PrimaryCaptureCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
-                            <FontIcon FontSize="{StaticResource IconSizeSmall}" Glyph="{x:Bind ViewModel.PrimaryCaptureGlyph, Mode=OneWay}" />
-                            <TextBlock Text="{x:Bind ViewModel.PrimaryCaptureLabel, Mode=OneWay}" />
-                        </StackPanel>
-                        <SplitButton.Flyout>
-                            <MenuFlyout Placement="Bottom">
-                                <MenuFlyoutItem
-                                    x:Uid="CaptureFullScreenLabel"
-                                    AutomationProperties.AutomationId="CaptureFullScreenItem"
-                                    Command="{x:Bind ViewModel.SelectCaptureFullScreenCommand}">
-                                    <MenuFlyoutItem.Icon>
-                                        <FontIcon Glyph="&#xE7B7;" />
-                                    </MenuFlyoutItem.Icon>
-                                </MenuFlyoutItem>
-                                <MenuFlyoutItem
-                                    x:Uid="CaptureRegionLabel"
-                                    AutomationProperties.AutomationId="CaptureRegionItem"
-                                    Command="{x:Bind ViewModel.SelectCaptureRegionCommand}">
-                                    <MenuFlyoutItem.Icon>
-                                        <FontIcon Glyph="&#xEF20;" />
-                                    </MenuFlyoutItem.Icon>
-                                </MenuFlyoutItem>
-                                <MenuFlyoutItem
-                                    x:Uid="CaptureWindowLabel"
-                                    AutomationProperties.AutomationId="CaptureWindowItem"
-                                    Command="{x:Bind ViewModel.SelectCaptureWindowCommand}">
-                                    <MenuFlyoutItem.Icon>
-                                        <FontIcon Glyph="&#xE737;" />
-                                    </MenuFlyoutItem.Icon>
-                                </MenuFlyoutItem>
-                            </MenuFlyout>
-                        </SplitButton.Flyout>
-                    </SplitButton>
-                </Border>
-
-                <!--  Open-folder pill, top-right (mirrors the Capture pill). Opens the captures folder;
-                      on every auto-save its folder icon briefly flips to a green check — that animation
-                      IS the "saved" feedback (no toast).  -->
-                <Border
-                    x:Name="OpenFolderBar"
-                    Margin="{StaticResource FloatingToolbarMargin}"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    Style="{StaticResource FloatingToolbarStyle}">
-                    <Button
-                        x:Name="OpenFolderButton"
-                        x:Uid="OpenFolderButton"
-                        Padding="{StaticResource IconButtonPadding}"
-                        AutomationProperties.AutomationId="OpenFolderButton"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Click="OnOpenFolderClick">
-                        <Grid>
-                            <FontIcon
-                                x:Name="FolderGlyph"
-                                FontSize="{StaticResource IconSizeSmall}"
-                                Glyph="&#xE8B7;" />
-                            <FontIcon
-                                x:Name="SavedCheck"
-                                FontSize="{StaticResource IconSizeSmall}"
-                                Foreground="{ThemeResource SystemFillColorSuccessBrush}"
-                                Glyph="&#xE73E;"
-                                Opacity="0"
-                                RenderTransformOrigin="0.5,0.5">
-                                <FontIcon.RenderTransform>
-                                    <ScaleTransform x:Name="SavedCheckScale" ScaleX="0.6" ScaleY="0.6" />
-                                </FontIcon.RenderTransform>
-                            </FontIcon>
-                        </Grid>
-                    </Button>
-                </Border>
-
-                <!--  Prominent, dismissible error surface (bottom). Friendly title up top; raw technical
-                      detail (code + exception) tucked into the details expander with a copy button.  -->
-                <InfoBar
-                    x:Name="ErrorInfoBar"
-                    Margin="{StaticResource ContentPadding}"
-                    VerticalAlignment="Bottom"
-                    AutomationProperties.AutomationId="ErrorInfoBar"
-                    IsOpen="{x:Bind ViewModel.IsErrorOpen, Mode=TwoWay}"
-                    Severity="Error"
-                    Title="{x:Bind ViewModel.ErrorTitle, Mode=OneWay}">
-                    <InfoBar.Content>
-                        <Expander
-                            x:Uid="ErrorDetailsExpander"
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Stretch">
-                            <StackPanel Spacing="{StaticResource SpacingSmall}">
-                                <TextBlock
-                                    AutomationProperties.AutomationId="ErrorDetailText"
-                                    IsTextSelectionEnabled="True"
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    Text="{x:Bind ViewModel.ErrorDetail, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                                <Button
-                                    x:Name="CopyErrorDetailButton"
-                                    x:Uid="ErrorCopyButton"
-                                    AutomationProperties.AutomationId="CopyErrorDetailButton"
-                                    Click="OnCopyErrorDetailClick" />
+                    <!--  Command pill, top-left. The menu changes the mode; the pill body captures.  -->
+                    <Border
+                        x:Name="CommandBar"
+                        Margin="{StaticResource FloatingToolbarMargin}"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Style="{StaticResource FloatingToolbarStyle}">
+                        <SplitButton
+                            x:Name="CaptureButton"
+                            AutomationProperties.AutomationId="CaptureButton"
+                            Click="CaptureButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
+                                <FontIcon
+                                    x:Name="PrimaryCaptureGlyph"
+                                    FontSize="{StaticResource IconSizeSmall}"
+                                    Glyph="&#xE7F4;" />
+                                <TextBlock x:Name="PrimaryCaptureLabel" />
                             </StackPanel>
-                        </Expander>
-                    </InfoBar.Content>
-                </InfoBar>
+                            <SplitButton.Flyout>
+                                <MenuFlyout Placement="Bottom">
+                                    <MenuFlyoutItem
+                                        x:Name="RegionCaptureItem"
+                                        x:Uid="RegionCaptureItem"
+                                        AutomationProperties.AutomationId="RegionCaptureItem"
+                                        Click="RegionCaptureItem_Click">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xEF20;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem
+                                        x:Name="WindowCaptureItem"
+                                        x:Uid="WindowCaptureItem"
+                                        AutomationProperties.AutomationId="WindowCaptureItem"
+                                        Click="WindowCaptureItem_Click">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE737;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem
+                                        x:Name="DesktopCaptureItem"
+                                        x:Uid="DesktopCaptureItem"
+                                        AutomationProperties.AutomationId="DesktopCaptureItem"
+                                        Click="DesktopCaptureItem_Click">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE7F4;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </SplitButton.Flyout>
+                        </SplitButton>
+                    </Border>
 
-                <ProgressRing
-                    Width="{StaticResource ProgressRingSize}"
-                    Height="{StaticResource ProgressRingSize}"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                    <!--  Open-folder pill, top-right (mirrors the Capture pill). Opens the captures folder;
+                          on every auto-save its folder icon briefly flips to a green check — that animation
+                          IS the "saved" feedback (no toast).  -->
+                    <Border
+                        x:Name="OpenFolderBar"
+                        Margin="{StaticResource FloatingToolbarMargin}"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Style="{StaticResource FloatingToolbarStyle}">
+                        <Button
+                            x:Name="OpenFolderButton"
+                            Padding="{StaticResource IconButtonPadding}"
+                            AutomationProperties.AutomationId="OpenFolderButton"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Click="OpenFolderButton_Click">
+                            <Grid>
+                                <FontIcon
+                                    x:Name="FolderGlyph"
+                                    FontSize="{StaticResource IconSizeSmall}"
+                                    Glyph="&#xE8B7;" />
+                                <FontIcon
+                                    x:Name="SavedCheck"
+                                    FontSize="{StaticResource IconSizeSmall}"
+                                    Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                    Glyph="&#xE73E;"
+                                    Opacity="0"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform x:Name="SavedCheckScale" ScaleX="0.6" ScaleY="0.6" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Grid>
+                        </Button>
+                    </Border>
+
+                    <!--  Dismissible error surface (bottom).  -->
+                    <InfoBar
+                        x:Name="ErrorInfoBar"
+                        Margin="{StaticResource ContentPadding}"
+                        VerticalAlignment="Bottom"
+                        AutomationProperties.AutomationId="ErrorInfoBar"
+                        IsClosable="True"
+                        IsOpen="{x:Bind ViewModel.HasError, Mode=TwoWay}"
+                        Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                        Severity="Error" />
+
+                    <ProgressRing
+                        Width="{StaticResource ProgressRingSize}"
+                        Height="{StaticResource ProgressRingSize}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
                 </Grid>
             </Grid>
         </Border>

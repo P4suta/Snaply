@@ -1,74 +1,914 @@
-param([Parameter(Mandatory)][int]$AppPid)
+param(
+    [Parameter(Mandatory)]
+    [int]$AppPid,
 
-# Manual UI smoke test for the content-centric layout (run with the `winapp ui` tooling).
-# NOT wired into CI — it drives the live app by AutomationId. After the settings-zero redesign:
-#   - the header row is gone; the primary capture control is a SplitButton
-#     (PrimaryCaptureButton in the floating toolbar), with per-mode menu items
-#     CaptureFullScreenItem / CaptureRegionItem / CaptureWindowItem;
-#   - Save/Copy float over the preview (PrimaryExportButton);
-#   - there is no Settings dialog, no beautify toggle and no About button (Snaply always
-#     beautifies; app details live in the bundled files). The command bar is just Capture +
-#     Save/Copy. Theme and language follow the OS (no in-app switch).
+    [ValidateSet('x64', 'arm64')]
+    [string]$Architecture = 'x64',
 
-$ErrorActionPreference = 'Continue'
-$pass = 0; $fail = 0; $results = @()
+    [ValidateRange(0, 1000)]
+    [int]$SoakIterations,
 
-function Test-UI {
-    param([string]$Name, [scriptblock]$Script)
-    try {
-        $output = & $Script 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            $script:pass++; $script:results += @{ name = $Name; status = "PASS" }
-            Write-Host "  PASS: $Name" -ForegroundColor Green
-        } else {
-            $script:fail++; $script:results += @{ name = $Name; status = "FAIL"; detail = "$output" }
-            Write-Host "  FAIL: $Name -- $output" -ForegroundColor Red
+    [ValidateRange(0, 1000)]
+    [int]$SoakCancellationInterval = 10,
+
+    [ValidateRange(0, 1000)]
+    [int]$SoakResizeInterval = 20,
+
+    [ValidateRange(0, 1000)]
+    [int]$SoakWarmupIterations = 30,
+
+    [string]$HandleDiagnosticTool
+)
+
+$ErrorActionPreference = 'Stop'
+$results = [System.Collections.Generic.List[object]]::new()
+$artifacts = Join-Path $PSScriptRoot '..\..\artifacts\ui'
+New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
+$artifacts = (Resolve-Path $artifacts).Path
+$autoSaveDirectory = Join-Path (
+    [Environment]::GetFolderPath([Environment+SpecialFolder]::MyPictures)) 'Screenshots\Snaply'
+$savesBeforeCapture = if (Test-Path -LiteralPath $autoSaveDirectory) {
+    @(Get-ChildItem -LiteralPath $autoSaveDirectory -Filter 'Snaply-*.png' -File).Count
+}
+else {
+    0
+}
+
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class WindowSizing
+{
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MouseInput
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public UIntPtr extraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KeyboardInput
+    {
+        public ushort virtualKey;
+        public ushort scanCode;
+        public uint flags;
+        public uint time;
+        public UIntPtr extraInfo;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct InputUnion
+    {
+        [FieldOffset(0)]
+        public MouseInput mouse;
+
+        [FieldOffset(0)]
+        public KeyboardInput keyboard;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Input
+    {
+        public uint type;
+        public InputUnion data;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint SendInput(uint count, Input[] inputs, int size);
+
+    public static bool SendMouse(uint flags)
+    {
+        Input[] inputs =
+        {
+            new Input
+            {
+                type = 0,
+                data = new InputUnion { mouse = new MouseInput { flags = flags } }
+            }
+        };
+        return SendInput(1, inputs, Marshal.SizeOf<Input>()) == 1;
+    }
+
+    public static bool MoveMouse(int dx, int dy)
+    {
+        Input[] inputs =
+        {
+            new Input
+            {
+                type = 0,
+                data = new InputUnion
+                {
+                    mouse = new MouseInput { dx = dx, dy = dy, flags = 0x0001 }
+                }
+            }
+        };
+        return SendInput(1, inputs, Marshal.SizeOf<Input>()) == 1;
+    }
+
+    public static bool SendEscape()
+    {
+        Input[] inputs =
+        {
+            new Input
+            {
+                type = 1,
+                data = new InputUnion
+                {
+                    keyboard = new KeyboardInput { virtualKey = 0x1B }
+                }
+            },
+            new Input
+            {
+                type = 1,
+                data = new InputUnion
+                {
+                    keyboard = new KeyboardInput { virtualKey = 0x1B, flags = 0x0002 }
+                }
+            }
+        };
+        return SendInput(2, inputs, Marshal.SizeOf<Input>()) == 2;
+    }
+}
+'@
+
+function Get-AppWindow {
+    $root = [System.Windows.Automation.AutomationElement]::RootElement
+    $condition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+        $AppPid)
+    $captureCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        'CaptureButton')
+    $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $condition)
+    foreach ($candidate in $windows) {
+        $capture = $candidate.FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            $captureCondition)
+        if ($capture) {
+            return $candidate
         }
-    } catch {
-        $script:fail++; $script:results += @{ name = $Name; status = "FAIL"; detail = "$_" }
-        Write-Host "  FAIL: $Name -- $_" -ForegroundColor Red
+    }
+
+    throw "No Snaply UI Automation window for process $AppPid."
+}
+
+function Get-AppElement {
+    param([string]$AutomationId)
+
+    $condition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        $AutomationId)
+    $element = (Get-AppWindow).FindFirst(
+        [System.Windows.Automation.TreeScope]::Descendants,
+        $condition)
+    if (-not $element) {
+        throw "No element with AutomationId '$AutomationId'."
+    }
+
+    return $element
+}
+
+function Get-RegionSelectionWindow {
+    $root = [System.Windows.Automation.AutomationElement]::RootElement
+    $processCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+        $AppPid)
+    $cancelCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        'RegionCancelButton')
+    $windows = $root.FindAll(
+        [System.Windows.Automation.TreeScope]::Children,
+        $processCondition)
+    $selectionWindows = [System.Collections.Generic.List[object]]::new()
+    foreach ($window in $windows) {
+        if ($window.FindFirst(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                $cancelCondition)) {
+            $selectionWindows.Add($window)
+        }
+    }
+
+    $focusCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::HasKeyboardFocusProperty,
+        $true)
+    foreach ($window in $selectionWindows) {
+        if ($window.FindFirst(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                $focusCondition)) {
+            return $window
+        }
+    }
+
+    if ($selectionWindows.Count -gt 0) {
+        return $selectionWindows[0]
+    }
+
+    throw 'No region selection window appeared.'
+}
+
+function Wait-ProcessElement {
+    param(
+        [string]$AutomationId,
+        [int]$Timeout = 5000
+    )
+
+    $root = [System.Windows.Automation.AutomationElement]::RootElement
+    $condition = [System.Windows.Automation.AndCondition]::new(
+        [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+            $AppPid),
+        [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+            $AutomationId))
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($Timeout)
+    do {
+        $element = $root.FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            $condition)
+        if ($element) {
+            return $element
+        }
+
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw "'$AutomationId' did not appear within ${Timeout}ms."
+}
+
+function Wait-AppElement {
+    param(
+        [string]$AutomationId,
+        [ValidateSet('Exists', 'IsEnabled', 'IsOffscreen')]
+        [string]$Property = 'Exists',
+        [bool]$Value = $true,
+        [int]$Timeout = 3000
+    )
+
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($Timeout)
+    $lastError = $null
+    do {
+        try {
+            $element = Get-AppElement $AutomationId
+            $actual = switch ($Property) {
+                'Exists' { $true }
+                'IsEnabled' { $element.Current.IsEnabled }
+                'IsOffscreen' { $element.Current.IsOffscreen }
+            }
+            if ($actual -eq $Value) {
+                return $element
+            }
+        }
+        catch {
+            $lastError = $_.Exception.Message
+        }
+
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw "'$AutomationId' did not reach $Property=$Value within ${Timeout}ms. $lastError"
+}
+
+function Get-CapturePickerCancelButtons {
+    $root = [System.Windows.Automation.AutomationElement]::RootElement
+    $cancelCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+        'CancelButton')
+    $buttons = [System.Collections.Generic.List[object]]::new()
+    $windows = $root.FindAll(
+        [System.Windows.Automation.TreeScope]::Children,
+        [System.Windows.Automation.Condition]::TrueCondition)
+    foreach ($window in $windows) {
+        if ($window.Current.Name -notmatch 'Snaply') {
+            continue
+        }
+
+        $button = $window.FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            $cancelCondition)
+        if ($button) {
+            $buttons.Add($button)
+        }
+    }
+
+    return $buttons
+}
+
+function Close-CapturePickers {
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        $before = @(Get-CapturePickerCancelButtons)
+        if ($before.Count -eq 0) {
+            return
+        }
+
+        $invokeError = $null
+        try {
+            $before[0].GetCurrentPattern(
+                [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        }
+        catch {
+            $invokeError = $_.Exception.Message
+        }
+
+        Start-Sleep -Milliseconds 200
+        $after = @(Get-CapturePickerCancelButtons)
+        if ($after.Count -ge $before.Count -and $invokeError) {
+            throw $invokeError
+        }
+    }
+
+    throw 'Stale GraphicsCapturePicker windows did not close.'
+}
+
+function Test-Ui {
+    param([string]$Name, [scriptblock]$Action)
+
+    try {
+        & $Action
+        if ($LASTEXITCODE -notin @(0, $null)) {
+            throw "Exit code $LASTEXITCODE"
+        }
+
+        $results.Add([pscustomobject]@{ name = $Name; status = 'PASS' })
+    }
+    catch {
+        [WindowSizing]::SendMouse(0x0004) | Out-Null
+        [WindowSizing]::SendEscape() | Out-Null
+        Start-Sleep -Milliseconds 100
+        $results.Add([pscustomobject]@{ name = $Name; status = 'FAIL'; detail = $_.Exception.Message })
     }
 }
 
-New-Item -ItemType Directory -Force -Path "screenshots" | Out-Null
+function Invoke-CaptureMode {
+    param([string]$AutomationId)
 
-# --- 1. Persistent command bar / chrome AutomationIds resolve ---
-$ids = @("PrimaryCaptureButton", "StatusText", "PreviewImage")
-foreach ($id in $ids) {
-    Test-UI "AutomationId resolves: $id" { winapp ui wait-for $id -a $AppPid -t 4000 }
-}
-winapp ui screenshot -a $AppPid -o "screenshots/01-empty.png" 2>$null
+    $lastError = $null
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        try {
+            $capture = Wait-AppElement CaptureButton IsEnabled $true 5000
+            $capture.SetFocus()
+            $expand = $capture.GetCurrentPattern(
+                [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+            if ($expand.Current.ExpandCollapseState -eq
+                [System.Windows.Automation.ExpandCollapseState]::Expanded) {
+                $expand.Collapse()
+            }
 
-# --- 2. Capture full screen via the SplitButton menu (no overlay) -> preview populates ---
-Test-UI "Open capture menu" { winapp ui expand "PrimaryCaptureButton" -a $AppPid }
-Start-Sleep -Milliseconds 600
-Test-UI "Invoke CaptureFullScreenItem" { winapp ui invoke "CaptureFullScreenItem" -a $AppPid }
-Start-Sleep -Seconds 2
-Test-UI "StatusText shows px dimensions" { winapp ui wait-for "StatusText" -a $AppPid --value "px" --contains -t 5000 }
+            $expand.Expand()
+            $item = Wait-ProcessElement $AutomationId 2000
+            $item.GetCurrentPattern(
+                [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            return
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            [WindowSizing]::SendEscape() | Out-Null
+            Start-Sleep -Milliseconds 100
+        }
+    }
 
-# --- 3. Export SplitButton appears and is enabled after capture ---
-Test-UI "PrimaryExportButton present" { winapp ui wait-for "PrimaryExportButton" -a $AppPid -t 4000 }
-Test-UI "PrimaryExportButton enabled after capture" { winapp ui wait-for "PrimaryExportButton" -a $AppPid -p IsEnabled --value "True" -t 5000 }
-winapp ui screenshot -a $AppPid -o "screenshots/02-after-capture.png" 2>$null
-
-# --- 4. Accessibility audit: interactive controls have AutomationId ---
-$allElements = (winapp ui inspect -a $AppPid --interactive --json 2>$null | ConvertFrom-Json).elements
-$appElements = @($allElements | Where-Object {
-    $_.type -match 'Button|TextBox|ComboBox|CheckBox|ToggleSwitch|Slider|Segmented|SplitButton' -and
-    $_.name -notmatch 'Minimize|Maximize|Close|System' -and
-    $_.className -notmatch 'PickerHost|#32770|CabinetWClass'
-})
-$missingId = @($appElements | Where-Object { -not $_.automationId })
-if ($missingId.Count -eq 0) {
-    $pass++; $results += @{ name = "Interactive controls have AutomationId"; status = "PASS" }
-    Write-Host "  PASS: Interactive controls have AutomationId" -ForegroundColor Green
-} else {
-    $fail++
-    $names = ($missingId | ForEach-Object { "$($_.type) '$($_.name)'" }) -join ", "
-    $results += @{ name = "AutomationId coverage"; status = "FAIL"; detail = "Missing: $names" }
-    Write-Host "  FAIL: AutomationId coverage -- Missing: $names" -ForegroundColor Red
+    throw "Could not invoke '$AutomationId'. $lastError"
 }
 
-Write-Host "`nPassed: $pass | Failed: $fail"
-$results | ConvertTo-Json | Out-File "test-results.json"
-if ($fail -gt 0) { exit 1 } else { exit 0 }
+function Invoke-PrimaryCapture {
+    $capture = Get-AppElement 'CaptureButton'
+    $capture.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+}
+
+function Wait-CaptureComplete {
+    param([int]$Timeout = 20000)
+
+    Wait-AppElement CaptureButton IsEnabled $true $Timeout | Out-Null
+    Wait-AppElement PreviewImage IsOffscreen $false 3000 | Out-Null
+}
+
+foreach ($id in @(
+    'CaptureButton',
+    'CopyButton',
+    'SaveAsButton',
+    'OpenFolderButton',
+    'PreviewScroller',
+    'StatusText'
+)) {
+    Test-Ui "$id exists" {
+        Wait-AppElement $id | Out-Null
+    }
+}
+
+Test-Ui 'Copy disabled before capture' {
+    Wait-AppElement CopyButton IsEnabled $false | Out-Null
+}
+Test-Ui 'Save As disabled before capture' {
+    Wait-AppElement SaveAsButton IsEnabled $false | Out-Null
+}
+Test-Ui 'Open Folder enabled before capture' {
+    Wait-AppElement OpenFolderButton IsEnabled $true | Out-Null
+}
+
+Test-Ui 'Narrow window keeps capture reachable' {
+    $window = Get-AppWindow
+    $handle = [IntPtr]$window.Current.NativeWindowHandle
+    if (-not [WindowSizing]::SetWindowPos(
+            $handle, [IntPtr]::Zero, 80, 80, 520, 480, 0x0014)) {
+        throw 'Narrow window resize failed.'
+    }
+
+    Wait-AppElement CaptureButton IsOffscreen $false | Out-Null
+    if (-not [WindowSizing]::SetWindowPos(
+            $handle, [IntPtr]::Zero, 80, 80, 1100, 720, 0x0014)) {
+        throw 'Window restore failed.'
+    }
+}
+
+Test-Ui 'Region cancellation recovers' {
+    Invoke-CaptureMode RegionCaptureItem
+    (Wait-ProcessElement RegionCancelButton).
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    Wait-AppElement CaptureButton IsEnabled $true 3000 | Out-Null
+}
+
+Test-Ui 'Region capture completes' {
+    Invoke-CaptureMode RegionCaptureItem
+    $null = Wait-ProcessElement RegionCancelButton
+    $overlay = Get-RegionSelectionWindow
+    $bounds = $overlay.Current.BoundingRectangle
+    $startX = [int]($bounds.Left + [Math]::Min(240, $bounds.Width / 4))
+    $startY = [int]($bounds.Top + [Math]::Min(200, $bounds.Height / 4))
+    $endX = [int][Math]::Min($bounds.Right - 40, $startX + 320)
+    $endY = [int][Math]::Min($bounds.Bottom - 40, $startY + 240)
+    if ($endX - $startX -lt 2 -or $endY - $startY -lt 2) {
+        throw 'Region overlay is too small for the drag journey.'
+    }
+
+    if (-not [WindowSizing]::SetCursorPos($startX, $startY)) {
+        throw 'Could not position the region pointer.'
+    }
+
+    if (-not [WindowSizing]::SendMouse(0x0002)) {
+        throw 'Could not press the region pointer.'
+    }
+
+    Start-Sleep -Milliseconds 100
+    for ($step = 0; $step -lt 10; $step++) {
+        if (-not [WindowSizing]::MoveMouse(
+                [int](($endX - $startX) / 10),
+                [int](($endY - $startY) / 10))) {
+            throw 'Could not drag the region pointer.'
+        }
+
+        Start-Sleep -Milliseconds 30
+    }
+
+    if (-not [WindowSizing]::SendMouse(0x0004)) {
+        throw 'Could not release the region pointer.'
+    }
+
+    Wait-AppElement CaptureButton IsEnabled $true 20000 | Out-Null
+    try {
+        Wait-AppElement PreviewImage IsOffscreen $false 3000 | Out-Null
+    }
+    catch {
+        $statusElement = Get-AppElement StatusText
+        $status = $statusElement.GetCurrentPattern(
+            [System.Windows.Automation.TextPattern]::Pattern).DocumentRange.GetText(-1)
+        throw "Region capture produced no preview. Status: $status"
+    }
+}
+
+Test-Ui 'Window picker cancellation recovers' {
+    Close-CapturePickers
+    Invoke-CaptureMode WindowCaptureItem
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $cancel = @(Get-CapturePickerCancelButtons) | Select-Object -First 1
+        if (-not $cancel) {
+            Start-Sleep -Milliseconds 100
+        }
+    } while (-not $cancel -and [DateTime]::UtcNow -lt $deadline)
+    if (-not $cancel) {
+        throw 'GraphicsCapturePicker did not appear.'
+    }
+
+    $invokeError = $null
+    try {
+        $cancel.GetCurrentPattern(
+            [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    }
+    catch {
+        $invokeError = $_.Exception.Message
+    }
+
+    try {
+        Wait-AppElement CaptureButton IsEnabled $true 5000 | Out-Null
+    }
+    catch {
+        if ($invokeError) {
+            throw "$invokeError $($_.Exception.Message)"
+        }
+
+        throw
+    }
+}
+
+Test-Ui 'Window capture completes' {
+    $started = [DateTime]::Now
+    $target = Start-Process notepad.exe -PassThru
+    try {
+        $deadline = [DateTime]::UtcNow.AddSeconds(10)
+        do {
+            $target = Get-Process notepad -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.StartTime -ge $started -and
+                    $_.MainWindowHandle -ne [IntPtr]::Zero -and
+                    -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle)
+                } |
+                Sort-Object StartTime -Descending |
+                Select-Object -First 1
+            if (-not $target) {
+                Start-Sleep -Milliseconds 100
+            }
+        } while (-not $target -and [DateTime]::UtcNow -lt $deadline)
+        if (-not $target) {
+            throw 'The window capture target did not start.'
+        }
+
+        Close-CapturePickers
+        Invoke-CaptureMode WindowCaptureItem
+        $root = [System.Windows.Automation.AutomationElement]::RootElement
+        $itemCondition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem)
+        $deadline = [DateTime]::UtcNow.AddSeconds(10)
+        do {
+            $items = $root.FindAll(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                $itemCondition)
+            $item = @($items | Where-Object {
+                $_.Current.Name -like "*$($target.MainWindowTitle)*"
+            }) | Select-Object -First 1
+            if (-not $item) {
+                Start-Sleep -Milliseconds 100
+            }
+        } while (-not $item -and [DateTime]::UtcNow -lt $deadline)
+        if (-not $item) {
+            throw "The picker did not list '$($target.MainWindowTitle)'."
+        }
+
+        $item.GetCurrentPattern(
+            [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        $acceptCondition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+            'AcceptButton')
+        $accept = $root.FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            $acceptCondition)
+        if (-not $accept) {
+            throw 'The picker accept button is missing.'
+        }
+
+        $accept.GetCurrentPattern(
+            [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        Wait-CaptureComplete
+    }
+    finally {
+        Close-CapturePickers
+        Wait-AppElement CaptureButton IsEnabled $true 5000 | Out-Null
+        if ($target -and -not $target.HasExited) {
+            $null = $target.CloseMainWindow()
+            if (-not $target.WaitForExit(5000)) {
+                Stop-Process -Id $target.Id -Force
+            }
+        }
+    }
+}
+
+Test-Ui 'Desktop capture completes' {
+    Invoke-CaptureMode DesktopCaptureItem
+    Wait-CaptureComplete
+}
+Test-Ui 'Copy enabled after capture' {
+    Wait-AppElement CopyButton IsEnabled $true | Out-Null
+}
+Test-Ui 'Save As enabled after capture' {
+    Wait-AppElement SaveAsButton IsEnabled $true | Out-Null
+}
+Test-Ui 'Automatic save created a PNG' {
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $current = if (Test-Path -LiteralPath $autoSaveDirectory) {
+            @(Get-ChildItem -LiteralPath $autoSaveDirectory -Filter 'Snaply-*.png' -File).Count
+        }
+        else {
+            0
+        }
+        if ($current -gt $savesBeforeCapture) {
+            break
+        }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    if ($current -le $savesBeforeCapture) {
+        throw 'No automatic save appeared.'
+    }
+}
+Test-Ui 'Copy places a bitmap on the clipboard' {
+    (Get-AppElement 'CopyButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    Start-Sleep -Milliseconds 200
+    if (-not [System.Windows.Forms.Clipboard]::ContainsImage()) {
+        throw 'Clipboard contains no image.'
+    }
+}
+Test-Ui 'Save As writes the retained PNG' {
+    $saveAsPath = Join-Path $artifacts 'save-as.png'
+    Remove-Item -LiteralPath $saveAsPath -Force -ErrorAction SilentlyContinue
+    (Get-AppElement 'SaveAsButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    Start-Sleep -Seconds 1
+    [System.Windows.Forms.SendKeys]::SendWait($saveAsPath)
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    while (-not (Test-Path -LiteralPath $saveAsPath) -and [DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not (Test-Path -LiteralPath $saveAsPath)) {
+        throw 'Save As did not create the file.'
+    }
+
+    $header = [System.IO.File]::ReadAllBytes($saveAsPath)[0..7]
+    $signature = [BitConverter]::ToString($header).Replace('-', '')
+    if ($signature -ne '89504E470D0A1A0A') {
+        throw 'Save As output is not a PNG.'
+    }
+}
+Test-Ui 'Open Folder opens the automatic-save directory' {
+    (Get-AppElement 'OpenFolderButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    $expected = [Uri]::new($autoSaveDirectory).AbsoluteUri.TrimEnd('/')
+    $shell = New-Object -ComObject Shell.Application
+    $deadline = [DateTime]::UtcNow.AddSeconds(8)
+    $matching = $null
+    do {
+        $matching = @($shell.Windows() | Where-Object {
+            $_.LocationURL.TrimEnd('/') -eq $expected
+        }) | Select-Object -First 1
+        if (-not $matching) {
+            Start-Sleep -Milliseconds 200
+        }
+    } while (-not $matching -and [DateTime]::UtcNow -lt $deadline)
+
+    if (-not $matching) {
+        throw 'Open Folder did not open the automatic-save directory.'
+    }
+    $matching.Quit()
+}
+
+Test-Ui 'Interactive controls expose UI Automation identity' {
+    $inspection = winapp ui inspect -a $AppPid --interactive --json | ConvertFrom-Json
+    $missing = @($inspection.windows.elements | Where-Object {
+        $_.type -match 'Button|SplitButton' -and
+        $_.name -notmatch 'Minimize|Maximize|Close|System|システム' -and
+        (-not $_.automationId -or -not $_.name)
+    })
+    if ($missing.Count -ne 0) {
+        throw (($missing | ForEach-Object name) -join ', ')
+    }
+}
+
+function Invoke-RegionCancellation {
+    $mainWindow = Get-AppWindow
+    $mainHandle = [IntPtr]$mainWindow.Current.NativeWindowHandle
+    $cleanupRequired = $true
+    try {
+        Invoke-CaptureMode RegionCaptureItem
+        $deadline = [DateTime]::UtcNow.AddSeconds(5)
+        do {
+            $foreground = [WindowSizing]::GetForegroundWindow()
+            $foregroundProcess = [uint32]0
+            $null = [WindowSizing]::GetWindowThreadProcessId(
+                $foreground,
+                [ref]$foregroundProcess)
+            if ($foreground -ne [IntPtr]::Zero -and
+                $foreground -ne $mainHandle -and
+                $foregroundProcess -eq $AppPid) {
+                break
+            }
+
+            Start-Sleep -Milliseconds 25
+        } while ([DateTime]::UtcNow -lt $deadline)
+
+        if ($foreground -eq [IntPtr]::Zero -or
+            $foreground -eq $mainHandle -or
+            $foregroundProcess -ne $AppPid) {
+            throw 'Region overlay did not receive keyboard focus.'
+        }
+
+        if (-not [WindowSizing]::SendEscape()) {
+            throw 'Escape input failed.'
+        }
+
+        Wait-AppElement CaptureButton IsEnabled $true 5000 | Out-Null
+        $cleanupRequired = $false
+    }
+    finally {
+        if ($cleanupRequired) {
+            [WindowSizing]::SendEscape() | Out-Null
+            Start-Sleep -Milliseconds 100
+            [WindowSizing]::SendEscape() | Out-Null
+        }
+    }
+}
+
+function Invoke-SoakStep {
+    param([int]$Iteration)
+
+    if ($SoakCancellationInterval -gt 0 -and
+        $Iteration % $SoakCancellationInterval -eq 0) {
+        Invoke-RegionCancellation
+    }
+
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    if ($SoakCancellationInterval -gt 0 -and
+        $Iteration % $SoakCancellationInterval -eq 0) {
+        Invoke-CaptureMode DesktopCaptureItem
+    }
+    else {
+        Invoke-PrimaryCapture
+    }
+
+    Wait-CaptureComplete
+    $timer.Stop()
+
+    if ($SoakResizeInterval -gt 0 -and
+        $Iteration % $SoakResizeInterval -eq 0) {
+        $width = if (($Iteration / $SoakResizeInterval) % 2 -eq 0) { 520 } else { 1100 }
+        $height = if (($Iteration / $SoakResizeInterval) % 2 -eq 0) { 480 } else { 720 }
+        Set-AppWindowSize $width $height
+    }
+
+    return $timer.Elapsed.TotalSeconds
+}
+
+function Set-AppWindowSize {
+    param(
+        [int]$Width,
+        [int]$Height
+    )
+
+    $window = Get-AppWindow
+    $handle = [IntPtr]$window.Current.NativeWindowHandle
+    if (-not [WindowSizing]::SetWindowPos(
+            $handle, [IntPtr]::Zero, 80, 80, $Width, $Height, 0x0014)) {
+        throw 'Window resize failed.'
+    }
+}
+
+function Get-StableProcessMetrics {
+    param([System.Diagnostics.Process]$Process)
+
+    $handles = [System.Collections.Generic.List[int]]::new()
+    $memory = [System.Collections.Generic.List[long]]::new()
+    for ($sample = 0; $sample -lt 20; $sample++) {
+        $Process.Refresh()
+        $handles.Add($Process.HandleCount)
+        $memory.Add($Process.PrivateMemorySize64)
+        Start-Sleep -Milliseconds 100
+    }
+
+    return [pscustomobject]@{
+        handles = ($handles | Measure-Object -Minimum).Minimum
+        privateBytes = ($memory | Measure-Object -Minimum).Minimum
+    }
+}
+
+function Write-HandleSnapshot {
+    param([string]$Name)
+
+    if (-not $HandleDiagnosticTool) {
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $HandleDiagnosticTool -PathType Leaf)) {
+        throw 'Handle diagnostic tool was not found.'
+    }
+
+    & $HandleDiagnosticTool -accepteula -nobanner -a -p $AppPid |
+        Set-Content -Encoding utf8 (Join-Path $artifacts "handles-$Name.txt")
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Handle diagnostic collection failed.'
+    }
+}
+
+if ($SoakIterations -gt 0) {
+    Test-Ui "$SoakIterations capture soak" {
+        $process = Get-Process -Id $AppPid
+        $durations = [System.Collections.Generic.List[double]]::new()
+        $samples = [System.Collections.Generic.List[object]]::new()
+
+        for ($iteration = 1; $iteration -le $SoakWarmupIterations; $iteration++) {
+            $null = Invoke-SoakStep $iteration
+        }
+
+        if ($SoakResizeInterval -gt 0) {
+            Set-AppWindowSize 520 480
+            Start-Sleep -Milliseconds 250
+            if ($SoakCancellationInterval -gt 0) {
+                Invoke-RegionCancellation
+                Invoke-CaptureMode DesktopCaptureItem
+                Wait-CaptureComplete
+            }
+            else {
+                $null = Invoke-SoakStep 1
+            }
+        }
+
+        Set-AppWindowSize 1100 720
+        Start-Sleep -Milliseconds 250
+        $baseline = Get-StableProcessMetrics $process
+        Write-HandleSnapshot baseline
+        for ($iteration = 1; $iteration -le $SoakIterations; $iteration++) {
+            $step = $SoakWarmupIterations + $iteration
+            $durations.Add((Invoke-SoakStep $step))
+
+            if ($iteration % 10 -eq 0) {
+                $process.Refresh()
+                $samples.Add([pscustomobject]@{
+                    iteration = $iteration
+                    handles = $process.HandleCount
+                    privateBytes = $process.PrivateMemorySize64
+                })
+            }
+        }
+
+        Set-AppWindowSize 1100 720
+        Start-Sleep -Milliseconds 250
+        $final = Get-StableProcessMetrics $process
+        Write-HandleSnapshot final
+        $ordered = $durations | Sort-Object
+        $p95Index = [Math]::Max(0, [Math]::Ceiling($ordered.Count * 0.95) - 1)
+        $p95 = $ordered[$p95Index]
+        $limit = if ($Architecture -eq 'arm64') { 3.5 } else { 2.5 }
+
+        [pscustomobject]@{
+            iterations = $SoakIterations
+            warmupIterations = $SoakWarmupIterations
+            p95Seconds = $p95
+            initialHandles = $baseline.handles
+            finalHandles = $final.handles
+            initialPrivateBytes = $baseline.privateBytes
+            finalPrivateBytes = $final.privateBytes
+            samples = $samples
+        } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifacts 'soak-results.json')
+
+        if ($final.handles -gt $baseline.handles) {
+            throw "Handle count grew from $($baseline.handles) to $($final.handles)."
+        }
+
+        $memoryLimit = [long][Math]::Ceiling($baseline.privateBytes * 1.10)
+        if ($final.privateBytes -gt $memoryLimit) {
+            throw "Private memory grew by more than 10%."
+        }
+
+        if ($p95 -gt $limit) {
+            throw "Capture p95 was $([Math]::Round($p95, 3))s; limit is ${limit}s."
+        }
+    }
+}
+
+$results | ConvertTo-Json -Depth 3 | Set-Content -Encoding utf8 (Join-Path $artifacts 'test-results.json')
+$failed = @($results | Where-Object status -eq 'FAIL')
+Write-Host "Passed: $($results.Count - $failed.Count) | Failed: $($failed.Count)"
+$failed | ForEach-Object { Write-Host "FAIL: $($_.name) - $($_.detail)" }
+if ($failed.Count -ne 0) {
+    exit 1
+}

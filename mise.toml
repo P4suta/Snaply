@@ -1,29 +1,18 @@
-# Snaply — project-local toolchain definition.
-# The whole environment is managed by mise + chezmoi, so this project supplies
-# its tools through mise too. mise auto-activates under this directory
-# (install with `mise install`).
-#
-# Note: never touch the global config (~/.config/mise/config.toml, chezmoi-managed).
-# Only project-specific runtimes are pinned here.
-
 [tools]
-# .NET SDK — mise's core:dotnet backend (prebuilt download, no VC++ build, which
-# matches the global "never run a VC++ build on Windows" policy).
-# Pinned to the 10.x line because WinUI 3 / Windows App SDK target net10.0-windows.
-# Pinned down to the patch: the Native AOT launcher's implicit PackageReference
-# (Microsoft.DotNet.ILCompiler) tracks the SDK patch, so without a fixed SDK the
-# packages.lock.json diverges between local and CI and locked-mode restore fails
-# with NU1004. When a newer patch ships, mise-outdated flags it and we bump here
-# deliberately.
 dotnet = "10.0.301"
-# Task runner (justfile): supplies the standard build / run / test / publish
-# recipes. Declared here so CI can invoke the same `just publish` (no duplicated
-# bundling logic).
-just = "1"
+# Git-hook manager. `lefthook install` wires the commit-msg (committed) and
+# pre-commit (typos) hooks; pinning it here provisions it via `mise install`.
+lefthook = "2"
+# Conventional-Commits linter for the lefthook commit-msg hook — the local guard
+# that keeps release-please's version + CHANGELOG derivation fed with well-formed
+# commits. cargo backend, binstalled.
+"cargo:committed" = "1"
+# Typo linter for the lefthook pre-commit hook (config: _typos.toml); mirrors the
+# crate-ci/typos check in ci.yml so the local and CI signals match. cargo backend.
+"cargo:typos-cli" = "1"
 
 [settings]
 experimental = true
-
-# Install the WinUI templates once, after dotnet is available:
-#   mise exec -- dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates
-# The winapp CLI is already installed in the environment (outside mise).
+# Fetch cargo: backend tools as prebuilt binaries (cargo-binstall) rather than
+# `cargo install` from source — much faster locally and in CI.
+cargo.binstall = true

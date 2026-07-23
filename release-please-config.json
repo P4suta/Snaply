@@ -7,13 +7,7 @@
       "release-type": "simple",
       "package-name": "snaply",
       "draft": true,
-      "force-tag-creation": true,
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "Directory.Build.props"
-        }
-      ]
+      "force-tag-creation": true
     }
   }
 }

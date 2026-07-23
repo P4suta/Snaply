@@ -1,92 +1,19 @@
 <Project>
-
-  <!-- ══════════════════════════════════════════════════════════════════════
-       Snaply — solution-wide analyzer & style discipline (convention hardening).
-
-       Single source of truth for every project in the solution (Core, Platform,
-       App, Tests). Unlike find-my-files — whose winapp-run analyzer injection
-       forbids a Directory.Build.props — Snaply has no such constraint, so the
-       strictness props and the three extra analyzer packages live here once
-       rather than being copy-pasted into four csproj files.
-
-       The .NET analyzers (CAxxxx) + Roslynator (RCSxxxx) + Meziantou (MAxxxx)
-       carry the correctness weight; StyleCop (SAxxxx) adds layout/ordering.
-       Canonical severities, the security-to-error pins, and the generated-code
-       exemptions all live in the repo-root .editorconfig.
-       ══════════════════════════════════════════════════════════════════════ -->
-
   <PropertyGroup>
-    <!-- Product version — the single source of truth for every assembly. Bumped
-         automatically by release-please (generic updater targets this property;
-         see release-please-config.json). Keep in sync with
-         .release-please-manifest.json. -->
-    <Version>0.1.1</Version> <!-- x-release-please-version -->
-
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <!-- Supply-chain: restore against a committed packages.lock.json so a build
-         can never silently re-resolve to a different dependency graph (the .NET
-         counterpart to Cargo's locked restore). CI restores in locked mode,
-         which fails if the lock is stale. Regenerate with `dotnet restore` and
-         commit the updated lock when dependencies change. -->
+    <Version>0.1.1</Version>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <!-- Don't publish the framework's localized satellite resource assemblies (de/es/fr/…):
-         Snaply's own UI is localized via WinUI MRT (Strings\{lang}\Resources.resw -> the app
-         .pri), a separate mechanism, so English framework resources are enough. Set
-         solution-wide because the self-contained CLI drags in the ASP.NET Core shared
-         framework, whose ~10 hyphen-less locale folders (cs, de, ja, ko, ru…) otherwise ship
-         and bloat the bundle. This is the clean root cause; publish.ps1's locale prune becomes
-         a belt-and-suspenders backstop. -->
-    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <!-- Maximal analyzer/style strictness: all .NET analyzer rules on, code style
-         enforced in the build, and every warning promoted to an error. Security
-         rules (CA2100/CA3xxx/CA5xxx) are pinned to error in .editorconfig;
-         generated WinUI XAML code (*.g.cs / *.g.i.cs) is exempted there. -->
+    <RestoreLockedMode Condition="'$(ContinuousIntegrationBuild)' == 'true'">true</RestoreLockedMode>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
     <AnalysisMode>All</AnalysisMode>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
-    <!-- Generate the XML doc file so IDE0005 (unused usings) is enforced in the
-         build; this also turns on CS1591 — every public member carries an XML doc.
-         Generated code and the test project are exempted from CS1591 in .editorconfig. -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Nullable>enable</Nullable>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <PathMap Condition="'$(CI)' == 'true'">$(MSBuildProjectDirectory)=/_/</PathMap>
+    <DebugType>portable</DebugType>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
-
-  <ItemGroup>
-    <!-- Extra build-time analyzers (convention hardening). Floating versions so a
-         missing exact pin can't break an offline restore. All three are
-         analyzer-only: PrivateAssets=all + the analyzers-scoped IncludeAssets keep
-         them out of the published output and from flowing to referencing projects. -->
-
-    <!-- Roslynator (RCSxxxx): broad code-quality / simplification rules. -->
-    <PackageReference Include="Roslynator.Analyzers" Version="4.*">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-
-    <!-- Meziantou (MAxxxx): correctness-focused — IFormatProvider/culture, async
-         pitfalls, equality, etc. — little overlap with the rules above. -->
-    <PackageReference Include="Meziantou.Analyzer" Version="3.*">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-
-    <!-- StyleCop (SAxxxx): layout/ordering/documentation. 1.2.0-beta is the line
-         that understands modern C# (file-scoped namespaces); the conflicting
-         opinion rules are turned off in .editorconfig. -->
-    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-*">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-
 </Project>
