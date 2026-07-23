@@ -47,13 +47,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
 
     internal CaptureMode LastCaptureMode { get; private set; } = CaptureMode.Region;
 
-    internal int ImageWidth => _image?.Width ?? 0;
-
-    internal int ImageHeight => _image?.Height ?? 0;
-
-    internal static string SuggestedFileName =>
-        ImageExportService.CreateSuggestedFileName(DateTimeOffset.Now);
-
     internal async Task CaptureAsync(CaptureMode mode)
     {
         if (IsBusy)
@@ -87,8 +80,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
             _image = image;
             Preview = preview;
             HasImage = true;
-            OnPropertyChanged(nameof(ImageWidth));
-            OnPropertyChanged(nameof(ImageHeight));
 
             Task<bool> save = TrySaveAutomaticallyAsync(image, operation.Token);
             Task<bool> copy = TryCopyAsync(image, operation.Token);
@@ -128,44 +119,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    internal async Task CopyAsync()
-    {
-        if (_image is null || IsBusy)
-        {
-            return;
-        }
-
-        HasError = false;
-        if (await TryCopyAsync(_image, CancellationToken.None))
-        {
-            StatusMessage = ResourceText.Get("StatusCopied");
-        }
-        else
-        {
-            ShowError("ErrorClipboard");
-        }
-    }
-
-    internal async Task SaveAsAsync(string path)
-    {
-        if (_image is null || IsBusy)
-        {
-            return;
-        }
-
-        HasError = false;
-        try
-        {
-            await _export.SaveAsAsync(_image, path, CancellationToken.None);
-            StatusMessage = ResourceText.Get("StatusSaved");
-        }
-        catch (Exception exception)
-        {
-            LogFailure("SaveAs", exception);
-            ShowError("ErrorSave");
-        }
-    }
-
     internal void OpenFolder()
     {
         HasError = false;
@@ -178,14 +131,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
             LogFailure("OpenFolder", exception);
             ShowError("ErrorOpenFolder");
         }
-    }
-
-    internal void Cancel() => _operation?.Cancel();
-
-    internal void ReportSaveFailure(Exception exception)
-    {
-        LogFailure("SavePicker", exception);
-        ShowError("ErrorSave");
     }
 
     public void Dispose()

@@ -64,45 +64,6 @@ internal sealed class ImageExportService
         }
     }
 
-    internal async Task SaveAsAsync(
-        RenderedImage image,
-        string path,
-        CancellationToken cancellationToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        string? directory = Path.GetDirectoryName(path);
-        if (string.IsNullOrWhiteSpace(directory))
-        {
-            throw new DirectoryNotFoundException();
-        }
-
-        Directory.CreateDirectory(directory);
-        string temporaryPath = Path.Combine(
-            directory,
-            $".{Path.GetFileName(path)}.{Environment.ProcessId}.{Interlocked.Increment(ref _temporarySequence)}.tmp");
-        try
-        {
-            await using (var stream = new FileStream(
-                temporaryPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                131_072,
-                FileOptions.Asynchronous | FileOptions.WriteThrough))
-            {
-                await stream.WriteAsync(image.Png, cancellationToken);
-                await stream.FlushAsync(cancellationToken);
-                stream.Flush(true);
-            }
-
-            File.Move(temporaryPath, path, true);
-        }
-        finally
-        {
-            DeleteTemporaryFile(temporaryPath);
-        }
-    }
-
     internal static async Task CopyAsync(RenderedImage image, CancellationToken cancellationToken)
     {
         for (int attempt = 0; ; attempt++)
