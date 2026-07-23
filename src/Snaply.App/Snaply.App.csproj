@@ -2,99 +2,56 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <TargetPlatformMinVersion>10.0.26100.0</TargetPlatformMinVersion>
     <RootNamespace>Snaply</RootNamespace>
+    <AssemblyName>Snaply</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- i18n: the source/fallback language. Localized strings live in
-         Strings\{lang}\Resources.resw (en-US / ja-JP / zh-Hans); MRT resolves the
-         best match for the user's PrimaryLanguageOverride at runtime. -->
-    <DefaultLanguage>en-US</DefaultLanguage>
-    <!-- Embed the app icon into the PE so Explorer / pinned shortcuts show it.
-         The taskbar/Alt-Tab icon comes from AppWindow.SetIcon at runtime
-         (loose Assets\AppIcon.ico, copied below). -->
+    <SnaplyPackageManifest Condition="'$(SnaplyPackageManifest)' == ''">Package.appxmanifest</SnaplyPackageManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-
-    <!-- Unpackaged + self-contained by design (mirrors find-my-files). No MSIX:
-         the app ships as a plain folder of files, carrying its own Windows App
-         SDK runtime. Deliberate deviation from the winui skill defaults — do NOT
-         "fix" back to packaged/MSIX. -->
-    <WindowsPackageType>None</WindowsPackageType>
-    <!-- Bundle the .NET runtime itself (not just the Windows App SDK): a plain
-         `-r win-x64` publish is framework-dependent unless SelfContained is set,
-         which produced a runtimeconfig demanding an installed .NET and the
-         "You must install or update .NET to run this application" error on any
-         machine without the SDK. WindowsAppSDKSelfContained only bundles WinAppSDK,
-         NOT the runtime — both are required for a truly standalone bundle. -->
-    <SelfContained>true</SelfContained>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <Platforms>x64</Platforms>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <SatelliteResourceLanguages>en-US;ja-JP;zh-Hans;zh-CN</SatelliteResourceLanguages>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
-    <EnableMsixTooling>false</EnableMsixTooling>
-
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Required by the source-generated [LibraryImport] P/Invokes (e.g. SetWindowDisplayAffinity). -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <SelfContained>true</SelfContained>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsPackageType Condition="'$(WindowsPackageType)' == ''">None</WindowsPackageType>
+    <EnableMsixTooling Condition="'$(WindowsPackageType)' == 'MSIX'">true</EnableMsixTooling>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- AppWindow.SetIcon takes a real file path, so the icon must exist on disk
-         next to the exe (publish included) — PRI embedding alone is not enough. -->
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
-    <!-- PNG face for the TitleBar's ImageIconSource (crisper than an .ico at that size);
-         the .ico above is the exe/taskbar face. Both must reach the output. -->
     <Content Include="Assets\AppIcon.png" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+    <AppxManifest Include="$(SnaplyPackageManifest)" Condition="'$(WindowsPackageType)' == 'MSIX'" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" Version="8.2.251219" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.251219" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2270" />
-    <!-- Windows App SDK *metapackage* (not the slimmer WinUI component package):
-         the Platform layer's Win2D dependency requires the metapackage, and mixing
-         the two double-imports the WinUI build targets. Self-contained still works;
-         the bundle is ~50MB larger than a Win2D-free component-package build. -->
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.4.0" />
-    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
-    <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.2.1" />
+    <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Snaply.Core\Snaply.Core.csproj" />
-    <ProjectReference Include="..\Snaply.Application\Snaply.Application.csproj" />
-    <ProjectReference Include="..\Snaply.Platform\Snaply.Platform.csproj" />
+    <ProjectReference Include="..\Snaply.Imaging\Snaply.Imaging.csproj" />
   </ItemGroup>
 
-  <!-- The shared use-case layer (CapturePipeline, SettingsStore, AppSettings, AppPaths,
-       AppTheme/AppLanguage) moved out of this project into Snaply.Application. A project-wide
-       global using keeps the many call sites (ViewModels, services, dialogs) unchanged. -->
-  <ItemGroup>
-    <Using Include="Snaply.Application" />
-  </ItemGroup>
-
-  <!-- Publish Properties -->
-  <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <!-- Trimming + WinUI reflection is unsafe (XAML types get stripped). -->
-    <PublishTrimmed>False</PublishTrimmed>
-  </PropertyGroup>
-
-  <!-- The WinUI component package wires the compiled-XAML artifacts (loose .xbf +
-       the app .pri) into build output but NOT into publish — that plumbing lived
-       in the metapackage we dropped. Without it a published unpackaged app dies
-       at first window with "XAML parsing failed". -->
-  <Target Name="PublishWinUIXamlArtifacts" AfterTargets="ComputeFilesToPublish">
+  <Target Name="PublishWinUIXamlArtifacts" AfterTargets="ComputeFilesToPublish" Condition="'$(WindowsPackageType)' == 'None'">
     <ItemGroup>
       <_WinUIXamlArtifact Include="$(OutputPath)**\*.xbf" />
       <_WinUIXamlArtifact Include="$(OutputPath)$(TargetName).pri" />
@@ -102,6 +59,14 @@
         <RelativePath>%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="RemovePdbsFromMsixPayload"
+          BeforeTargets="_CalculateInputsForGenerateAppxPackageRecipe"
+          Condition="'$(WindowsPackageType)' == 'MSIX'">
+    <ItemGroup>
+      <AppxPackagePayload Remove="@(AppxPackagePayload)" Condition="'%(Extension)' == '.pdb'" />
     </ItemGroup>
   </Target>
 </Project>

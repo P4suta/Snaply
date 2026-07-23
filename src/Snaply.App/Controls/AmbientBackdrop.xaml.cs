@@ -4,8 +4,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
-using Snaply.Core.Beautify;
-using Snaply.Core.Models;
 using Windows.Foundation;
 using Windows.UI;
 using Visual = Microsoft.UI.Composition.Visual;
@@ -29,7 +27,7 @@ namespace Snaply.Controls;
 /// no pointer input, and it only runs while <see cref="IsActive"/> — the per-frame updates stop and
 /// the control hides once a capture covers it.
 /// </summary>
-public sealed partial class AmbientBackdrop : UserControl
+internal sealed partial class AmbientBackdrop : UserControl
 {
     /// <summary>Identifies the <see cref="IsActive"/> dependency property.</summary>
     public static readonly DependencyProperty IsActiveProperty = DependencyProperty.Register(
@@ -265,9 +263,9 @@ public sealed partial class AmbientBackdrop : UserControl
         for (int i = 0; i < BlobCount; i++)
         {
             // Colour: this blob's hue is the rotating base plus a golden-angle offset (even spread).
-            Rgba colour = BeautifyDefaults.OklchToRgba(SoftLightness, chroma, _hue + (i * GoldenAngleDeg));
-            _brushes[i].GradientStops[0].Color = Color.FromArgb(blobAlpha, colour.R, colour.G, colour.B);
-            _brushes[i].GradientStops[1].Color = Color.FromArgb(0, colour.R, colour.G, colour.B);
+            (byte r, byte g, byte b) = OklchToRgb(SoftLightness, chroma, _hue + (i * GoldenAngleDeg));
+            _brushes[i].GradientStops[0].Color = Color.FromArgb(blobAlpha, r, g, b);
+            _brushes[i].GradientStops[1].Color = Color.FromArgb(0, r, g, b);
 
             // Motion: quasiperiodic Lissajous drift + a gentle breathing scale about the centre.
             float dx = (float)(_amplitude * Math.Sin((_freqX[i] * t) + _phaseX[i]));
@@ -280,9 +278,40 @@ public sealed partial class AmbientBackdrop : UserControl
 
         // Base wash: a soft two-tone that fills the whole card, its stops a golden-angle apart and
         // riding the same rotating hue, so there's always colour even between the blobs.
-        Rgba wash0 = BeautifyDefaults.OklchToRgba(SoftLightness, chroma * 0.85, _hue);
-        Rgba wash1 = BeautifyDefaults.OklchToRgba(SoftLightness, chroma * 0.85, _hue + GoldenAngleDeg);
-        BaseWashStop0.Color = Color.FromArgb(washAlpha, wash0.R, wash0.G, wash0.B);
-        BaseWashStop1.Color = Color.FromArgb(washAlpha, wash1.R, wash1.G, wash1.B);
+        (byte w0R, byte w0G, byte w0B) = OklchToRgb(SoftLightness, chroma * 0.85, _hue);
+        (byte w1R, byte w1G, byte w1B) = OklchToRgb(SoftLightness, chroma * 0.85, _hue + GoldenAngleDeg);
+        BaseWashStop0.Color = Color.FromArgb(washAlpha, w0R, w0G, w0B);
+        BaseWashStop1.Color = Color.FromArgb(washAlpha, w1R, w1G, w1B);
     }
+
+    // Perceptually-uniform OKLCH → opaque sRGB (gamut-clamped per channel). Kept self-contained here
+    // so the backdrop depends on nothing beyond the framework; the maths mirrors the colour science
+    // the app uses elsewhere (equal OKLCH steps look equally spaced, which is where the softness reads).
+    private static (byte R, byte G, byte B) OklchToRgb(double lightness, double chroma, double hueDegrees)
+    {
+        double h = hueDegrees * Math.PI / 180.0;
+        double a = chroma * Math.Cos(h);
+        double bComponent = chroma * Math.Sin(h);
+
+        double lRoot = lightness + (0.3963377774 * a) + (0.2158037573 * bComponent);
+        double mRoot = lightness - (0.1055613458 * a) - (0.0638541728 * bComponent);
+        double sRoot = lightness - (0.0894841775 * a) - (1.2914855480 * bComponent);
+        double lCubed = lRoot * lRoot * lRoot;
+        double mCubed = mRoot * mRoot * mRoot;
+        double sCubed = sRoot * sRoot * sRoot;
+
+        double red = (4.0767416621 * lCubed) - (3.3077115913 * mCubed) + (0.2309699292 * sCubed);
+        double green = (-1.2684380046 * lCubed) + (2.6097574011 * mCubed) - (0.3413193965 * sCubed);
+        double blue = (-0.0041960863 * lCubed) - (0.7034186147 * mCubed) + (1.7076147010 * sCubed);
+
+        return (ToByte(LinearToSrgb(red)), ToByte(LinearToSrgb(green)), ToByte(LinearToSrgb(blue)));
+    }
+
+    private static double LinearToSrgb(double channel)
+    {
+        double c = Math.Clamp(channel, 0.0, 1.0);
+        return c <= 0.0031308 ? (12.92 * c) : ((1.055 * Math.Pow(c, 1.0 / 2.4)) - 0.055);
+    }
+
+    private static byte ToByte(double channel) => (byte)Math.Clamp(Math.Round(channel * 255.0), 0, 255);
 }

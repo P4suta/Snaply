@@ -1,156 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
-    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
-    <xsd:element name="root" msdata:IsDataSet="true">
-      <xsd:complexType>
-        <xsd:choice maxOccurs="unbounded">
-          <xsd:element name="metadata">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" />
-              </xsd:sequence>
-              <xsd:attribute name="name" use="required" type="xsd:string" />
-              <xsd:attribute name="type" type="xsd:string" />
-              <xsd:attribute name="mimetype" type="xsd:string" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="assembly">
-            <xsd:complexType>
-              <xsd:attribute name="alias" type="xsd:string" />
-              <xsd:attribute name="name" type="xsd:string" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="data">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
-              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
-              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="resheader">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" />
-            </xsd:complexType>
-          </xsd:element>
-        </xsd:choice>
-      </xsd:complexType>
-    </xsd:element>
-  </xsd:schema>
-  <resheader name="resmimetype">
-    <value>text/microsoft-resx</value>
-  </resheader>
-  <resheader name="version">
-    <value>2.0</value>
-  </resheader>
-  <resheader name="reader">
-    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </resheader>
-  <resheader name="writer">
-    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </resheader>
-  <!-- ===== コマンドバー (MainPage.xaml) ===== -->
-  <data name="CaptureFullScreenLabel.Text" xml:space="preserve">
-    <value>全画面をキャプチャ</value>
-  </data>
-  <data name="CaptureRegionLabel.Text" xml:space="preserve">
-    <value>範囲をキャプチャ</value>
-  </data>
-  <data name="CaptureWindowLabel.Text" xml:space="preserve">
-    <value>ウィンドウをキャプチャ</value>
-  </data>
-  <!-- ===== 統合キャプチャボタン (SplitButton primary ラベル + ヒーローヒント) ===== -->
-  <data name="CaptureModeRegion" xml:space="preserve">
-    <value>領域をキャプチャ</value>
-  </data>
-  <data name="CaptureModeFullScreen" xml:space="preserve">
-    <value>全画面をキャプチャ</value>
-  </data>
-  <data name="CaptureModeWindow" xml:space="preserve">
-    <value>ウィンドウをキャプチャ</value>
-  </data>
-  <!-- ===== キャプチャオーバーレイ (RegionOverlayWindow.xaml / WindowPickerOverlay.xaml) ===== -->
-  <data name="RegionHint.Text" xml:space="preserve">
-    <value>ドラッグで範囲を選択  ·  Esc でキャンセル</value>
-  </data>
-  <data name="WindowPickerHint.Text" xml:space="preserve">
-    <value>ウィンドウをクリックしてキャプチャ  ·  Esc でキャンセル</value>
-  </data>
-  <!-- ===== ズーム操作 (ZoomableImage.xaml) ===== -->
-  <data name="PreviewImageA11y.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>整形されたスクリーンショットのプレビュー</value>
-  </data>
-  <!-- ===== 保存ダイアログ (MainPage.xaml.cs) ===== -->
-  <!-- ===== エクスポートボタンのラベル (MainViewModel) ===== -->
-  <!-- ===== エラー可視化 (ErrorPresenter / InfoBar) ===== -->
-  <data name="Error_capture_monitor" xml:space="preserve">
-    <value>画面をキャプチャできませんでした。</value>
-  </data>
-  <data name="Error_capture_window" xml:space="preserve">
-    <value>そのウィンドウをキャプチャできませんでした。</value>
-  </data>
-  <data name="Error_capture_region" xml:space="preserve">
-    <value>選択した範囲をキャプチャできませんでした。</value>
-  </data>
-  <data name="Error_beautify_render" xml:space="preserve">
-    <value>スクリーンショットを描画できませんでした。</value>
-  </data>
-  <data name="Error_export_save" xml:space="preserve">
-    <value>スクリーンショットを保存できませんでした。</value>
-  </data>
-  <data name="Error_export_clipboard" xml:space="preserve">
-    <value>スクリーンショットをクリップボードにコピーできませんでした。</value>
-  </data>
-  <data name="Error_hotkey_register" xml:space="preserve">
-    <value>ショートカットキーを登録できませんでした。</value>
-  </data>
-  <data name="Error_hotkey_parse" xml:space="preserve">
-    <value>ショートカットキーが無効です。</value>
-  </data>
-  <data name="Error_hotkey_disposed" xml:space="preserve">
-    <value>ショートカット機能が利用できません。</value>
-  </data>
-  <data name="Error_pipeline_nocapture" xml:space="preserve">
-    <value>対象がまだありません。先に何かをキャプチャしてください。</value>
-  </data>
-  <data name="Error_unknown" xml:space="preserve">
-    <value>問題が発生しました。</value>
-  </data>
-  <data name="ErrorDetailsExpander.Header" xml:space="preserve">
-    <value>詳細</value>
-  </data>
-  <data name="ErrorCopyButton.Content" xml:space="preserve">
-    <value>コピー</value>
-  </data>
-  <!-- ===== クラッシュダイアログ (CrashHandler / App) ===== -->
-  <data name="CrashTitle" xml:space="preserve">
-    <value>問題が発生しました</value>
-  </data>
-  <data name="CrashBody" xml:space="preserve">
-    <value>Snaply で予期しないエラーが発生しました。クラッシュレポートをログフォルダに保存しました。作業を続ける、再起動する、ログを見る、のいずれかを選べます。</value>
-  </data>
-  <data name="CrashOpenLogs" xml:space="preserve">
-    <value>ログを開く</value>
-  </data>
-  <data name="CrashRestart" xml:space="preserve">
-    <value>再起動</value>
-  </data>
-  <data name="CrashClose" xml:space="preserve">
-    <value>閉じる</value>
-  </data>
-  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
-    <value>保存先フォルダーを開く</value>
-  </data>
-  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
-    <value>保存先フォルダーを開く</value>
-  </data>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="CaptureButton.Content" xml:space="preserve"><value>領域を撮影</value></data>
+  <data name="CaptureButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>スクリーンショットを撮影</value></data>
+  <data name="CaptureRegion" xml:space="preserve"><value>領域を撮影</value></data>
+  <data name="CaptureWindow" xml:space="preserve"><value>ウィンドウを撮影</value></data>
+  <data name="CaptureDesktop" xml:space="preserve"><value>デスクトップを撮影</value></data>
+  <data name="RegionCaptureItem.Text" xml:space="preserve"><value>領域</value></data>
+  <data name="WindowCaptureItem.Text" xml:space="preserve"><value>ウィンドウ</value></data>
+  <data name="DesktopCaptureItem.Text" xml:space="preserve"><value>デスクトップ全体</value></data>
+  <data name="CopyButton.Label" xml:space="preserve"><value>コピー</value></data>
+  <data name="SaveAsButton.Label" xml:space="preserve"><value>名前を付けて保存</value></data>
+  <data name="OpenFolderButton.Label" xml:space="preserve"><value>フォルダーを開く</value></data>
+  <data name="FitButton.Label" xml:space="preserve"><value>全体表示</value></data>
+  <data name="ActualSizeButton.Label" xml:space="preserve"><value>100%</value></data>
+  <data name="PreviewScroller.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>スクリーンショットのプレビュー領域</value></data>
+  <data name="PreviewImage.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>加工済みスクリーンショットのプレビュー</value></data>
+  <data name="StatusText.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>撮影状態</value></data>
+  <data name="BusyIndicator.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>撮影中</value></data>
+  <data name="EmptyStateTitle.Text" xml:space="preserve"><value>スクリーンショットを撮影</value></data>
+  <data name="EmptyStateBody.Text" xml:space="preserve"><value>領域、ウィンドウ、または仮想デスクトップ全体を選択します。</value></data>
+  <data name="SaveAsCommit" xml:space="preserve"><value>保存</value></data>
+  <data name="PngFiles" xml:space="preserve"><value>PNG画像</value></data>
+  <data name="StatusReady" xml:space="preserve"><value>準備完了。</value></data>
+  <data name="StatusCapturingRegion" xml:space="preserve"><value>領域を選択してください。</value></data>
+  <data name="StatusCapturingWindow" xml:space="preserve"><value>ウィンドウまたはディスプレイを選択してください。</value></data>
+  <data name="StatusCapturingDesktop" xml:space="preserve"><value>デスクトップを撮影しています。</value></data>
+  <data name="StatusSavedCopied" xml:space="preserve"><value>Pictures\Screenshots\Snaplyへ保存し、コピーしました。</value></data>
+  <data name="StatusSavedOnly" xml:space="preserve"><value>保存しましたが、コピーに失敗しました。コピーを再実行できます。</value></data>
+  <data name="StatusCopiedOnly" xml:space="preserve"><value>コピーしましたが、自動保存に失敗しました。名前を付けて保存できます。</value></data>
+  <data name="StatusExportFailed" xml:space="preserve"><value>プレビューを作成しました。自動保存とコピーは失敗しましたが、どちらも再実行できます。</value></data>
+  <data name="StatusCopied" xml:space="preserve"><value>コピーしました。</value></data>
+  <data name="StatusSaved" xml:space="preserve"><value>保存しました。</value></data>
+  <data name="StatusCancelled" xml:space="preserve"><value>撮影をキャンセルしました。</value></data>
+  <data name="ErrorCapture" xml:space="preserve"><value>選択した内容を撮影できませんでした。</value></data>
+  <data name="ErrorClipboard" xml:space="preserve"><value>スクリーンショットをコピーできませんでした。</value></data>
+  <data name="ErrorSave" xml:space="preserve"><value>スクリーンショットを保存できませんでした。</value></data>
+  <data name="ErrorOpenFolder" xml:space="preserve"><value>スクリーンショットフォルダーを開けませんでした。</value></data>
+  <data name="RegionHint" xml:space="preserve"><value>ドラッグして選択 · Escでキャンセル</value></data>
+  <data name="RegionCancel" xml:space="preserve"><value>キャンセル</value></data>
 </root>

@@ -1,55 +1,40 @@
 using System.Runtime.InteropServices;
-using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
 
 namespace Snaply;
 
-/// <summary>
-/// The application window. This hosts a Frame that displays pages. Add your
-/// UI and logic to MainPage.xaml / MainPage.xaml.cs instead of here so you
-/// can use Page features such as navigation events and the Loaded lifecycle.
-/// </summary>
 public sealed partial class MainWindow : Window
 {
-    [DllImport("user32.dll")]
-    private static extern uint GetDpiForWindow(IntPtr hWnd);
+    private const uint WdaExcludeFromCapture = 0x00000011;
 
-    /// <summary>Sets up the title bar, icon, initial size and navigates to the main page.</summary>
-    public MainWindow()
+    internal MainWindow(MainViewModel viewModel, ScreenCaptureService capture)
     {
         InitializeComponent();
-
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-
         AppWindow.SetIcon("Assets/AppIcon.ico");
 
-        SizeToEditor();
-
-        // Navigate the root frame to the main page on startup.
-        RootFrame.Navigate(typeof(MainPage));
+        nint handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        double scale = GetDpiForWindow(handle) / 96d;
+        AppWindow.Resize(new SizeInt32(
+            checked((int)Math.Round(1100 * scale)),
+            checked((int)Math.Round(720 * scale))));
+        bool exclusionEnabled = SetWindowDisplayAffinity(handle, WdaExcludeFromCapture)
+            && GetWindowDisplayAffinity(handle, out uint affinity)
+            && affinity == WdaExcludeFromCapture;
+        capture.SetAppWindow(this, exclusionEnabled);
+        ContentHost.Children.Add(new MainPage(viewModel));
     }
 
-    /// <summary>
-    /// Sizes the window for an editor layout. AppWindow.Resize takes physical
-    /// pixels, so the DIP dimensions (from the design tokens) are scaled by the
-    /// monitor DPI. Read via GetDpiForWindow because XamlRoot.RasterizationScale
-    /// is null in the constructor.
-    /// </summary>
-    private void SizeToEditor()
-    {
-        double widthDip = ReadTokenDouble("WindowWidth", 1200);
-        double heightDip = ReadTokenDouble("WindowHeight", 800);
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetWindowDisplayAffinity(nint window, uint affinity);
 
-        IntPtr hwnd = Win32Interop.GetWindowFromWindowId(AppWindow.Id);
-        double scale = GetDpiForWindow(hwnd) / 96.0;
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetWindowDisplayAffinity(nint window, out uint affinity);
 
-        AppWindow.Resize(new SizeInt32((int)(widthDip * scale), (int)(heightDip * scale)));
-    }
-
-    private static double ReadTokenDouble(string key, double fallback) =>
-        Microsoft.UI.Xaml.Application.Current.Resources.TryGetValue(key, out object? value) && value is double d
-            ? d
-            : fallback;
+    [LibraryImport("user32.dll")]
+    private static partial uint GetDpiForWindow(nint window);
 }

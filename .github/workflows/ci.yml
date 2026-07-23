@@ -4,203 +4,127 @@ on:
   push:
     branches: [main]
   pull_request:
-    # labeled/unlabeled are added so the label-driven `release-gate` re-evaluates
-    # when `release: approved` is added/removed. The heavy windows tier skips on
-    # these label events (see each job's `if`), so the cost is only the cheap
-    # ubuntu tier + the gate.
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches: [main]
 
-# Cancel superseded PR runs; never cancel main (post-merge lineage/artifacts).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  DOTNET_NOLOGO: "1"
-  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
-
-# Least privilege by default; the only job needing more (pr-title) sets its own.
 permissions:
   contents: read
 
-jobs:
-  # Skip the heavy windows job on docs-only PRs (ci-required treats its
-  # `skipped` as success, so branch protection still passes).
-  changes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      code: ${{ steps.f.outputs.code }}
-      pkg: ${{ steps.f.outputs.pkg }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
-        id: f
-        with:
-          filters: |
-            code:
-              - 'src/**'
-              - 'tests/**'
-              - 'Directory.Build.props'
-              - '.editorconfig'
-              - 'Snaply.slnx'
-              - 'mise.toml'
-              - '**/packages.lock.json'
-              - '.github/workflows/ci.yml'
-              - '.github/actions/**'
-            # The release-packaging surface: anything that changes what `just publish`
-            # produces (the bundle, the launcher, the csproj publish props) or how the
-            # release/nightly jobs run. Guards the publish-smoke job so a publish.ps1 /
-            # justfile / csproj change can never merge with zero build (the class of gap
-            # that shipped a framework-dependent v0.1.0 — the App .csproj lacked
-            # <SelfContained>, which a plain `dotnet build` never exercises).
-            pkg:
-              - 'scripts/**'
-              - 'justfile'
-              - '**/*.csproj'
-              - 'Directory.Build.props'
-              - 'mise.toml'
-              - 'Snaply.slnx'
-              # The Native AOT launcher is built ONLY by `just publish` (the windows
-              # job's dotnet build compiles App + CLI, never the launcher), so its
-              # source must trigger the publish smoke or AOT breakage stays hidden.
-              - 'src/Snaply.Launcher/**'
-              - '.github/workflows/release.yml'
-              - '.github/workflows/nightly.yml'
-              - '.github/actions/**'
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  TESTINGPLATFORM_TELEMETRY_OPTOUT: "1"
 
-  # ── ubuntu hygiene tier: parallel, no needs, cheap fast-fail signal ──
+jobs:
   hygiene:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      # Lint the workflow YAML itself: syntax, ${{ }} expression types, and
-      # shellcheck over run: blocks. Catches workflow errors before a release run.
       - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
-      - uses: crate-ci/typos@bee27e3a4fd1ea2111cf90ab89cd076c870fce14 # v1.47.2 (reads root _typos.toml)
+      - uses: crate-ci/typos@bee27e3a4fd1ea2111cf90ab89cd076c870fce14 # v1.47.2
+      - name: Reject incomplete implementation markers
+        shell: bash
+        run: |
+          if rg -n 'TODO|FIXME|HACK|NotImplementedException' src tests scripts; then
+            echo "::error::incomplete implementation marker found"
+            exit 1
+          fi
 
-  # Core is plain net10.0 with zero platform dependencies, so its tests run on
-  # cheap ubuntu — proving the architecture's platform-independence in CI.
-  core-tests:
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
-    runs-on: ubuntu-latest
+  quality:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - name: Restore locked dependencies
+        run: dotnet restore Snaply.slnx --locked-mode
+      # Clear PathMap for this coverage build only: CI's PathMap (/_/) otherwise breaks
+      # coverlet's source resolution and makes it report 0% line coverage.
+      - name: Test imaging
+        run: >-
+          dotnet test tests/Snaply.Tests/Snaply.Tests.csproj
+          -c Release --no-restore
+          -p:PathMap=
+          --collect:"XPlat Code Coverage"
+          --logger "trx;LogFileName=results.trx"
+          --results-directory artifacts/test
+      - name: Test filesystem workflows
+        run: >-
+          dotnet test tests/Snaply.App.Tests/Snaply.App.Tests.csproj
+          -c Release --no-restore
+          --logger "trx;LogFileName=results.trx"
+          --results-directory artifacts/app-test
+      - name: Reject skipped tests and low coverage
+        shell: pwsh
+        run: |
+          [xml]$trx = Get-Content artifacts/test/results.trx -Raw
+          if ([int]$trx.TestRun.ResultSummary.Counters.notExecuted -ne 0) {
+            throw "Required tests were skipped."
+          }
+          [xml]$coverage = Get-Content (
+            Get-ChildItem artifacts/test -Recurse -Filter coverage.cobertura.xml |
+              Select-Object -First 1
+          ).FullName -Raw
+          if ([double]$coverage.coverage.'line-rate' -lt 0.85) {
+            throw "Line coverage is below 85%."
+          }
+          [xml]$appTrx = Get-Content artifacts/app-test/results.trx -Raw
+          if ([int]$appTrx.TestRun.ResultSummary.Counters.notExecuted -ne 0) {
+            throw "Required filesystem tests were skipped."
+          }
+      - name: Build x64
+        run: >-
+          dotnet build src/Snaply.App/Snaply.App.csproj
+          -c Release -p:Platform=x64 --no-restore
+      - name: Build ARM64
+        run: >-
+          dotnet build src/Snaply.App/Snaply.App.csproj
+          -c Release -p:Platform=ARM64 --no-restore
+      - name: Verify formatting
+        env:
+          Configuration: Release
+        run: dotnet format Snaply.slnx --verify-no-changes --no-restore
+
+  packaging:
+    runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-dotnet-mise
-      - name: test + line coverage gate
-        shell: bash
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - name: Build and validate unsigned release payloads
+        shell: pwsh
         run: |
-          mise exec -- dotnet test tests/Snaply.Tests/Snaply.Tests.csproj \
-            -p:RestoreLockedMode=true \
-            --collect:"XPlat Code Coverage" --results-directory build/coverage
-          cobertura=$(find build/coverage -name 'coverage.cobertura.xml' | head -1)
-          if [ -z "$cobertura" ]; then echo "::error::no coverage report produced"; exit 1; fi
-          rate=$(grep -o 'line-rate="[0-9.]*"' "$cobertura" | head -1 | sed 's/[^0-9.]//g')
-          pct=$(awk "BEGIN { printf \"%.1f\", $rate * 100 }")
-          echo "Core line coverage: ${pct}%"
-          # Measured ~89%; gate held a few points below for run-to-run headroom.
-          awk "BEGIN { exit !($rate >= 0.85) }" || {
-            echo "::error::Core line coverage ${pct}% is below the 85% gate"; exit 1; }
+          [xml]$props = Get-Content Directory.Build.props -Raw
+          ./scripts/release.ps1 `
+            -Action Build `
+            -Version "$($props.Project.PropertyGroup.Version)" `
+            -Publisher CN=Snaply `
+            -OutputRoot build/package-smoke
 
-  # ── windows tier: the only place App/Platform (net10.0-windows) can build ──
-  windows:
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
-    runs-on: windows-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-dotnet-mise
-      # Locked restore (supply chain): fail rather than silently re-resolve.
-      - name: Restore (locked)
-        run: mise exec -- dotnet restore Snaply.slnx --locked-mode
-      # Release build of the app under the strict analyzer set + TreatWarningsAsErrors
-      # — the compiler is the lint gate. Platform=x64 (App/Platform default).
-      - name: Build app (Release, x64)
-        run: mise exec -- dotnet build src/Snaply.App/Snaply.App.csproj -c Release -p:Platform=x64 --no-restore
-      # Same gate for the CLI + MCP host (Snaply.Cli): the compiler + strict analyzers
-      # over the System.CommandLine / Spectre / MCP code and the shared Application layer.
-      - name: Build CLI (Release, x64)
-        run: mise exec -- dotnet build src/Snaply.Cli/Snaply.Cli.csproj -c Release -p:Platform=x64 --no-restore
-      # Whole-solution formatting check (.editorconfig). Runs on windows so the
-      # net10.0-windows projects load.
-      - name: Format check
-        run: mise exec -- dotnet format Snaply.slnx --verify-no-changes --no-restore
-
-  # ── publish smoke: exercise the actual release packaging on PRs ──
-  # A plain `dotnet build` (the windows job) never runs `dotnet publish`, so
-  # self-contained/RID/AOT regressions in the packaging path stay invisible until
-  # nightly or a real release. Run `just publish` here on the packaging surface
-  # (see the `pkg` filter): it assembles the self-contained bundle, builds the
-  # Native AOT launcher, and runs publish.ps1's self-verify (the framework-dependent
-  # guard + bundle-integrity checks). Shift-left for the class of bug that shipped
-  # v0.1.0. No version arg = an unstamped dev bundle; no signing/zip needed here.
-  publish-smoke:
-    needs: [changes]
-    if: needs.changes.outputs.pkg == 'true' && github.event.action != 'labeled' && github.event.action != 'unlabeled'
-    runs-on: windows-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-dotnet-mise
-      - name: Publish smoke (self-contained bundle + AOT launcher + self-verify)
-        run: mise exec -- just publish
-
-  pr-title:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      pull-requests: read
-    steps:
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # A release-please Release PR (labelled "autorelease: pending") cannot be merged
-  # until a human deliberately adds the "release: approved" label. Every non-release
-  # PR passes unconditionally.
-  release-gate:
-    if: github.event_name == 'pull_request'
+  # Aggregate gate the branch protection requires (context "ci-required"): green only
+  # when every CI job above succeeded. Keeps the required-checks list stable as jobs change.
+  ci-required:
+    needs: [hygiene, quality, packaging]
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      pull-requests: read
     steps:
-      - name: Require an explicit approval label on a Release PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.number }}
-          REPO: ${{ github.repository }}
+      - name: Require all CI jobs to succeed
         run: |
-          labels=$(gh pr view "$PR" --repo "$REPO" --json labels -q '.labels[].name')
-          if echo "$labels" | grep -qx "autorelease: pending"; then
-            if echo "$labels" | grep -qx "release: approved"; then
-              echo "Release PR carries 'release: approved' — gate open."
-            else
-              echo "::error::This is a release PR. Add the 'release: approved' label to allow merge (deliberate release)."
-              exit 1
-            fi
-          else
-            echo "Not a release PR — gate passes."
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then
+            echo "::error::a required CI job did not succeed"
+            exit 1
           fi
-
-  # Single required status check. Transitively enforces the leaves and treats
-  # `skipped` (docs-only / paths-gated) as success — avoids the "Expected —
-  # Waiting" deadlock. PR-only: it gates PR merges.
-  ci-required:
-    if: ${{ always() && github.event_name == 'pull_request' }}
-    # `changes` is included so a failure of the paths-filter itself (which gates
-    # core-tests/windows/publish-smoke) fails the gate instead of silently
-    # skipping everything into a green check.
-    needs: [changes, hygiene, core-tests, windows, publish-smoke, pr-title, release-gate]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: gate on needed job results
-        uses: ./.github/actions/gate-results
-        with:
-          results: ${{ join(needs.*.result, ',') }}
+          echo "all required CI jobs passed"

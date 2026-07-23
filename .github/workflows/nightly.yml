@@ -1,52 +1,145 @@
-# Nightly deep checks that are too slow for every PR:
-#   mutation  -> Stryker.NET mutation testing over Snaply.Core (pure logic, small
-#                surface — an ideal mutation target). Proves the tests actually
-#                catch regressions, not just execute lines.
-#   publish   -> the full `just publish` (self-contained app + Native AOT
-#                launcher) on Windows, the release path CI's lighter build skips.
 name: nightly
 
 on:
   schedule:
-    - cron: "27 3 * * *" # daily 03:27 UTC
+    - cron: "27 3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  TESTINGPLATFORM_TELEMETRY_OPTOUT: "1"
+
 jobs:
-  mutation:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  native:
+    name: native-${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            platform: x64
+            rid: win-x64
+            runner: windows-latest
+          - architecture: arm64
+            platform: ARM64
+            rid: win-arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-dotnet-mise
-      - name: Restore (locked)
-        run: mise exec -- dotnet restore tests/Snaply.Tests/Snaply.Tests.csproj --locked-mode
-      - name: Install Stryker.NET
-        run: mise exec -- dotnet tool install --global dotnet-stryker --version 4.16.0
-      - name: Mutation test Snaply.Core
-        working-directory: tests/Snaply.Tests
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          global-json-file: global.json
+          architecture: ${{ matrix.architecture }}
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - uses: microsoft/setup-WinAppCli@64bc6fd4c3e4c69e2de589dfc34684470891b8b7
+        with:
+          version: v0.3.1
+      - run: dotnet restore Snaply.slnx --locked-mode
+      - run: dotnet test tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore
+      - if: matrix.architecture == 'x64'
+        run: dotnet test tests/Snaply.App.Tests/Snaply.App.Tests.csproj -c Release --no-restore
+      - name: Publish native portable payload
+        run: >-
+          dotnet publish src/Snaply.App/Snaply.App.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          -p:Platform=${{ matrix.platform }}
+          -p:WindowsPackageType=None
+          --self-contained true
+          -o build/native
+          --no-restore
+      - name: Repeat UI journeys five times
+        shell: pwsh
         run: |
-          export PATH="$PATH:$HOME/.dotnet/tools"
-          dotnet stryker --project Snaply.Core.csproj --break-at 80 --reporter progress --reporter html
+          1..5 | ForEach-Object {
+            $process = Start-Process build/native/Snaply.exe -PassThru
+            try {
+              ./src/Snaply.App/ui-tests.ps1 `
+                -AppPid $process.Id `
+                -Architecture ${{ matrix.architecture }}
+              if ($LASTEXITCODE -ne 0) { throw "UI pass $_ failed." }
+            }
+            finally {
+              $null = $process.CloseMainWindow()
+              if (-not $process.WaitForExit(5000)) {
+                Stop-Process -Id $process.Id -Force
+              }
+            }
+          }
+      - name: Run 100-capture soak
+        shell: pwsh
+        run: |
+          $process = Start-Process build/native/Snaply.exe -PassThru
+          try {
+            ./src/Snaply.App/ui-tests.ps1 `
+              -AppPid $process.Id `
+              -Architecture ${{ matrix.architecture }} `
+              -SoakIterations 100
+            if ($LASTEXITCODE -ne 0) { throw "Soak failed." }
+            if (@(Get-NetTCPConnection -OwningProcess $process.Id -ErrorAction SilentlyContinue).Count) {
+              throw "Snaply opened a TCP socket."
+            }
+          }
+          finally {
+            $null = $process.CloseMainWindow()
+            if (-not $process.WaitForExit(5000)) {
+              Stop-Process -Id $process.Id -Force
+            }
+          }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: stryker-report
-          path: tests/Snaply.Tests/StrykerOutput/**/reports/mutation-report.html
-          if-no-files-found: warn
+          name: ui-${{ matrix.architecture }}
+          path: artifacts/ui
+          if-no-files-found: error
 
-  publish:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - run: dotnet restore tests/Snaply.Tests/Snaply.Tests.csproj --locked-mode
+      - run: dotnet tool install --tool-path build/tools dotnet-stryker --version 4.16.0
+      - name: Mutation test Imaging
+        working-directory: tests/Snaply.Tests
+        run: >-
+          ../../build/tools/dotnet-stryker
+          --test-runner mtp
+          --break-at 85
+          --reporter progress
+          --reporter html
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: mutation-report
+          path: tests/Snaply.Tests/StrykerOutput/**/reports/mutation-report.html
+          if-no-files-found: error
+
+  reproducibility:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-dotnet-mise
-      - name: Full publish (self-contained app + AOT launcher)
-        run: mise exec -- just publish
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
-          name: nightly-bundle
-          path: build/dist/Snaply
-          if-no-files-found: error
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - name: Build twice
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props -Raw
+          $version = "$($props.Project.PropertyGroup.Version)"
+          ./scripts/test-reproducibility.ps1 -Version $version

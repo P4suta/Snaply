@@ -1,19 +1,10 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# Snaply — repository ignore rules (single source of truth for every project).
-# ─────────────────────────────────────────────────────────────────────────────
-
-## Build output ---------------------------------------------------------------
 [Bb]in/
 [Oo]bj/
 [Dd]ebug/
 [Rr]elease/
-# The distributable bundle + packaging output (build/dist, build/package,
-# build/sbom, build/.launcher, build/sign-stage, build/signed). ~200MB of
-# generated artifacts — never tracked.
 build/
 artifacts/
 
-## Visual Studio / Rider / editors --------------------------------------------
 .vs/
 .vscode/
 .idea/
@@ -25,7 +16,6 @@ _ReSharper*/
 *.DotSettings.user
 *.dotCover
 
-## Build logs & test results --------------------------------------------------
 [Ll]og/
 [Ll]ogs/
 *.log
@@ -37,15 +27,12 @@ _ReSharper*/
 coverage/
 StrykerOutput/
 
-## NuGet ----------------------------------------------------------------------
 *.nupkg
 *.snupkg
 *.nuget.props
 *.nuget.targets
 project.lock.json
-# NB: packages.lock.json is deliberately committed (locked-mode supply chain).
 
-## MSIX / publish (unused — Snaply ships unpackaged — but guard anyway) --------
 AppPackages/
 BundleArtifacts/
 *.msix
@@ -57,15 +44,8 @@ publish/
 *.pubxml
 PublishScripts/
 
-## docfx generated site -------------------------------------------------------
-docs/_site/
-docs/api/
-docs/obj/
-
-## Generated files ------------------------------------------------------------
 Generated\ Files/
 *_wpftmp.csproj
 
-## OS --------------------------------------------------------------------------
 .DS_Store
 Thumbs.db

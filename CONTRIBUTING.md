@@ -1,100 +1,21 @@
-# Contributing to Snaply
+# Contributing
 
-Thanks for your interest in improving Snaply. This guide covers the local
-setup, the conventions the project enforces, and what CI expects from a PR.
+Use Windows 11 24H2 or later and the .NET SDK pinned by `global.json`.
 
-## Toolchain
-
-Snaply provisions its toolchain with [mise](https://mise.jdx.dev/) — the pinned
-.NET 10 SDK and [just](https://github.com/casey/just) are declared in
-`mise.toml`. Do **not** install the SDK globally; let mise supply it.
-
-```sh
-mise install            # one-time: install the pinned tools
-just                    # list all recipes
-just build              # build the solution
-just test               # headless Core unit tests
-just run                # build + launch the app
+```powershell
+dotnet restore Snaply.slnx --locked-mode
+dotnet build src/Snaply.App/Snaply.App.csproj -c Release -p:Platform=x64 --no-restore
+dotnet test tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore
+$env:Configuration = 'Release'
+dotnet format Snaply.slnx --verify-no-changes --no-restore
 ```
 
-## Architecture principles
+Before a pull request:
 
-Snaply's single most important quality bar is **architectural cleanliness**.
-Before adding code, make sure it respects the boundaries:
+- Keep the product GUI-only and local-only.
+- Add no public API, capability, dependency, setting, or abstraction without a current product need.
+- Add tests for behavior and non-trivial calculations.
+- Keep comments for ABI, ownership, lifetime, security, or non-obvious algorithms only.
+- Use Conventional Commits and keep the branch green with no warnings or skipped required tests.
 
-- **`Snaply.Core` has zero dependencies** and never references a platform type
-  (no WinUI, no Win32, no `System.Drawing`). It is pure logic over immutable
-  records, and its tests run on Linux. If your change needs a platform API, it
-  belongs in `Snaply.Platform`, behind a Core-defined port.
-- **`Snaply.Platform`** holds the adapters (WGC, Win2D, Win32, tray). It
-  implements the ports declared in Core.
-- **`Snaply.App`** is the WinUI 3 shell and the DI composition root only —
-  ViewModels never reference WinUI types directly (strings come in via
-  `IUiStrings`, etc.).
-- Failures are explicit via the `Result` type — no silent catches.
-- One service, one responsibility. No god objects.
-
-When a design decision is ambiguous, choose beauty, separation, and
-testability.
-
-## CLI & MCP dev loop
-
-The `snaply` CLI and the MCP server both live in `src/Snaply.Cli` and share
-their use cases (capture pipeline, beautify mapping, settings) through
-`src/Snaply.Application` — never reach into `Snaply.Platform` from here. Run the
-health check first, then iterate:
-
-```sh
-just cli -- doctor                       # toolchain + capture-runtime health check
-just cli-build                           # build the CLI
-just cli -- capture full --out test.png  # exercise a capture end-to-end
-just mcp                                  # smoke the stdio MCP server
-```
-
-New public API in `Snaply.Cli` (and everywhere else) needs XML doc comments —
-`TreatWarningsAsErrors` turns missing-doc `CS1591` into a build failure, so
-document types and members as you add them.
-
-## Code style & analyzers
-
-The whole solution builds with `TreatWarningsAsErrors` and a strict analyzer
-set (.NET analyzers + Roslynator + Meziantou + StyleCop; see
-`Directory.Build.props` and `.editorconfig`). CI runs `dotnet format
---verify-no-changes`, so format locally before pushing:
-
-```sh
-dotnet format
-```
-
-## Commit messages
-
-Commits and PR titles follow
-[Conventional Commits](https://www.conventionalcommits.org/) — this is what
-drives `release-please` (versioning + CHANGELOG) and is enforced by the
-`pr-title` CI check. Examples:
-
-```
-feat: add scrolling-window capture
-fix: keep clipboard copy on the UI thread
-docs: document the release process
-chore(deps): bump CommunityToolkit.Mvvm
-```
-
-## Before you open a PR
-
-- `just test` is green (Core tests + coverage).
-- `just build-app` is clean (0 warnings under `TreatWarningsAsErrors`).
-- `dotnet format --verify-no-changes` reports no diffs.
-- `dotnet restore --locked-mode` succeeds (if you changed dependencies, commit
-  the updated `packages.lock.json`).
-
-CI runs the full matrix (hygiene, tests, Windows build, CodeQL, supply-chain
-scans) and gates merges on the aggregated `ci-required` check.
-
-## What CI does *not* run (and why)
-
-Some checks from the sister project [find-my-files](https://github.com/P4suta/find-my-files)
-are Rust-specific and have no meaningful .NET equivalent, so they are
-deliberately omitted: fuzzing (`cargo-fuzz`), `cargo-deny`, `cargo-machete`,
-and TOML formatting. Mutation testing is covered by Stryker.NET in the nightly
-workflow instead.
+Release packaging and UI automation are documented in [RELEASING.md](RELEASING.md).

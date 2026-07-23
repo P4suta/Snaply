@@ -25,7 +25,7 @@ namespace Snaply.Controls;
 /// <c>_translateY</c> fields always hold the <em>target</em> state, so the cursor-anchor math stays
 /// pixel-correct at rest.
 /// </remarks>
-public sealed partial class ZoomableImage : UserControl
+internal sealed partial class ZoomableImage : UserControl
 {
     /// <summary>Identifies the <see cref="Source"/> dependency property.</summary>
     public static readonly DependencyProperty SourceProperty = DependencyProperty.Register(
