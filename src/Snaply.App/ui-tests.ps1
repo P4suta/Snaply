@@ -116,22 +116,6 @@ public static class WindowSizing
         return SendInput(1, inputs, Marshal.SizeOf<Input>()) == 1;
     }
 
-    public static bool MoveMouse(int dx, int dy)
-    {
-        Input[] inputs =
-        {
-            new Input
-            {
-                type = 0,
-                data = new InputUnion
-                {
-                    mouse = new MouseInput { dx = dx, dy = dy, flags = 0x0001 }
-                }
-            }
-        };
-        return SendInput(1, inputs, Marshal.SizeOf<Input>()) == 1;
-    }
-
     public static bool SendEscape()
     {
         Input[] inputs =
@@ -526,10 +510,14 @@ Test-Ui 'Region capture completes' {
     }
 
     Start-Sleep -Milliseconds 100
-    for ($step = 0; $step -lt 10; $step++) {
-        if (-not [WindowSizing]::MoveMouse(
-                [int](($endX - $startX) / 10),
-                [int](($endY - $startY) / 10))) {
+    # Step the cursor in absolute coordinates. Relative SendInput moves are scaled by the
+    # pointer speed and "enhance pointer precision" settings, so the drag landed somewhere
+    # other than the target and the selection never closed — the overlay was still up when
+    # the assertion timed out, and arm64 (different pointer defaults) failed far more often.
+    for ($step = 1; $step -le 10; $step++) {
+        $x = [int]($startX + (($endX - $startX) * $step / 10))
+        $y = [int]($startY + (($endY - $startY) * $step / 10))
+        if (-not [WindowSizing]::SetCursorPos($x, $y)) {
             throw 'Could not drag the region pointer.'
         }
 
