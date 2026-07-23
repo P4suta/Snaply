@@ -95,6 +95,17 @@ jobs:
               Stop-Process -Id $process.Id -Force
             }
           }
+      # A UI failure otherwise reports only "element did not appear"; Snaply's own log
+      # carries the exception behind it, so ship it alongside the results.
+      - name: Collect app logs
+        if: always()
+        shell: pwsh
+        run: |
+          $logs = Join-Path $env:LOCALAPPDATA 'Snaply\Logs'
+          if (Test-Path $logs) {
+            New-Item -ItemType Directory -Force -Path artifacts/ui/app-logs | Out-Null
+            Copy-Item "$logs\*" artifacts/ui/app-logs -Recurse -Force
+          }
       # Only reached when the UI journeys and the soak both passed, so the payload
       # published here is one that survived every nightly gate.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
