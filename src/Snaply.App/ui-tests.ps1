@@ -22,6 +22,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $results = [System.Collections.Generic.List[object]]::new()
+$diagnosticCount = 0
 $artifacts = Join-Path $PSScriptRoot '..\..\artifacts\ui'
 New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
 $artifacts = (Resolve-Path $artifacts).Path
@@ -345,6 +346,59 @@ function Close-CapturePickers {
     throw 'Stale GraphicsCapturePicker windows did not close.'
 }
 
+# A failure message only says which element never showed up. Snapshot the process's
+# actual window tree first, so the report distinguishes "the window was never created"
+# from "it exists but automation cannot see it". Capped, and never allowed to mask the
+# real failure.
+function Write-FailureDiagnostic {
+    param([string]$Name)
+
+    if ($script:diagnosticCount -ge 2) {
+        return
+    }
+
+    $script:diagnosticCount++
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add("=== $Name ===")
+    try {
+        $lines.Add("Responding: $((Get-Process -Id $AppPid).Responding)")
+        $root = [System.Windows.Automation.AutomationElement]::RootElement
+        $processCondition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+            $AppPid)
+        $windows = $root.FindAll(
+            [System.Windows.Automation.TreeScope]::Children,
+            $processCondition)
+        $lines.Add("Top-level windows: $($windows.Count)")
+        foreach ($window in $windows) {
+            $lines.Add(
+                "  class=$($window.Current.ClassName)" +
+                " name='$($window.Current.Name)'" +
+                " bounds=$($window.Current.BoundingRectangle)" +
+                " offscreen=$($window.Current.IsOffscreen)")
+            $descendants = $window.FindAll(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                [System.Windows.Automation.Condition]::TrueCondition)
+            foreach ($element in $descendants) {
+                if (-not $element.Current.AutomationId) {
+                    continue
+                }
+
+                $lines.Add(
+                    "    $($element.Current.AutomationId)" +
+                    " type=$($element.Current.ControlType.ProgrammaticName)" +
+                    " offscreen=$($element.Current.IsOffscreen)" +
+                    " enabled=$($element.Current.IsEnabled)")
+            }
+        }
+    }
+    catch {
+        $lines.Add("Diagnostic capture failed: $($_.Exception.Message)")
+    }
+
+    Add-Content -LiteralPath (Join-Path $artifacts 'diagnostics.txt') -Value $lines
+}
+
 function Test-Ui {
     param([string]$Name, [scriptblock]$Action)
 
@@ -357,6 +411,7 @@ function Test-Ui {
         $results.Add([pscustomobject]@{ name = $Name; status = 'PASS' })
     }
     catch {
+        Write-FailureDiagnostic $Name
         [WindowSizing]::SendMouse(0x0004) | Out-Null
         [WindowSizing]::SendEscape() | Out-Null
         Start-Sleep -Milliseconds 100

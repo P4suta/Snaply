@@ -102,10 +102,21 @@ jobs:
         shell: pwsh
         run: |
           $logs = Join-Path $env:LOCALAPPDATA 'Snaply\Logs'
-          if (Test-Path $logs) {
-            New-Item -ItemType Directory -Force -Path artifacts/ui/app-logs | Out-Null
-            Copy-Item "$logs\*" artifacts/ui/app-logs -Recurse -Force
+          # An empty folder is dropped by upload-artifact, so say out loud which case
+          # this is: no folder means the app never got as far as configuring logging,
+          # an empty one means it ran and logged nothing.
+          if (-not (Test-Path $logs)) {
+            Write-Host "No log directory at $logs."
+            exit 0
           }
+          $files = @(Get-ChildItem $logs -File)
+          Write-Host "Log directory holds $($files.Count) file(s)."
+          foreach ($file in $files) {
+            Write-Host "--- $($file.Name) ---"
+            Get-Content $file.FullName | Write-Host
+          }
+          New-Item -ItemType Directory -Force -Path artifacts/ui/app-logs | Out-Null
+          Copy-Item "$logs\*" artifacts/ui/app-logs -Recurse -Force
       # Only reached when the UI journeys and the soak both passed, so the payload
       # published here is one that survived every nightly gate.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
