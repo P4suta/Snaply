@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 
 namespace Snaply;
@@ -19,6 +20,13 @@ public sealed partial class MainPage : Page
         ViewModel = viewModel;
         InitializeComponent();
         UpdatePrimaryCapture();
+
+        // The Open Folder button is icon-only, so give it an accessible name and a tooltip.
+        // Kept in code-behind alongside the other presentation strings (the view model stays
+        // free of UI text).
+        string openFolder = ResourceText.Get("OpenFolderLabel");
+        AutomationProperties.SetName(OpenFolderButton, openFolder);
+        ToolTipService.SetToolTip(OpenFolderButton, openFolder);
         ViewModel.PropertyChanged += (_, args) =>
         {
             // Each successful auto-save bumps SavedTick; play the folder→green-check flip.
