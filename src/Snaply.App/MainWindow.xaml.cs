@@ -16,7 +16,9 @@ public sealed partial class MainWindow : Window
         AppWindow.SetIcon("Assets/AppIcon.ico");
 
         nint handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        double scale = GetDpiForWindow(handle) / 96d;
+        // GetDpiForWindow returns 0 on failure; fall back to 96 (100%) so the window is never sized to 0×0.
+        uint dpi = GetDpiForWindow(handle);
+        double scale = (dpi == 0 ? 96u : dpi) / 96d;
         AppWindow.Resize(new SizeInt32(
             checked((int)Math.Round(1100 * scale)),
             checked((int)Math.Round(720 * scale))));

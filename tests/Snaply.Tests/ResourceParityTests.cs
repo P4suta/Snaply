@@ -28,6 +28,36 @@ public sealed class ResourceParityTests
     }
 
     [Fact]
+    public void Keys_referenced_from_code_exist_in_every_locale()
+    {
+        // Keys passed as string literals to ResourceText.Get(...) have no compile-time link to the
+        // .resw files, so a rename or typo would silently surface an empty label or accessible name
+        // at runtime. Pin the set here so a mismatch fails the build instead.
+        string[] requiredKeys =
+        [
+            "CaptureRegion",
+            "CaptureWindow",
+            "CaptureDesktop",
+            "OpenFolderLabel",
+            "ErrorCapture",
+            "ErrorOpenFolder",
+            "RegionHint",
+            "RegionCancel",
+        ];
+
+        string root = Path.Combine(AppContext.BaseDirectory, "Strings");
+        foreach (string file in Directory.GetFiles(root, "Resources.resw", SearchOption.AllDirectories))
+        {
+            HashSet<string> keys = XDocument.Load(file)
+                .Root!
+                .Elements("data")
+                .Select(element => (string)element.Attribute("name")!)
+                .ToHashSet(StringComparer.Ordinal);
+            Assert.All(requiredKeys, key => Assert.Contains(key, keys));
+        }
+    }
+
+    [Fact]
     public void Resources_are_unique_and_non_empty()
     {
         string root = Path.Combine(AppContext.BaseDirectory, "Strings");
