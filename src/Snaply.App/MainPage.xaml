@@ -12,14 +12,14 @@
     mc:Ignorable="d">
 
     <Grid>
-        <!--  Canvas: the preview card with a persistent floating command bar.  -->
+        <!--  Preview card with floating command bars.  -->
         <Border
             Margin="{StaticResource ContentPadding}"
             Style="{StaticResource PreviewSurfaceStyle}">
             <Grid>
                 <Grid.Resources>
-                    <!--  "Saved" feedback: the folder icon briefly flips to a green check that pops in,
-                          holds, then flips back. Played by the code-behind on each successful auto-save.  -->
+                    <!--  Saved feedback: the folder icon flips to a green check and back.
+                          Played by the code-behind after each successful auto-save.  -->
                     <Storyboard x:Name="SavedFeedback">
                         <DoubleAnimationUsingKeyFrames Storyboard.TargetName="FolderGlyph" Storyboard.TargetProperty="Opacity">
                             <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1" />
@@ -46,25 +46,22 @@
                     </Storyboard>
                 </Grid.Resources>
 
-                <!--  Ambient backdrop: a soft field of freely, gently shifting colour that fills the
-                      WHOLE card — always on, so the captured image floats over a living background.
-                      It calms (lower saturation, slower colour drift) while an image is shown.  -->
+                <!--  Ambient backdrop: always-on animated background. Muted (lower saturation
+                      and drift) while an image is shown.  -->
                 <ctrl:AmbientBackdrop
                     x:Name="AmbientBackdrop"
                     IsActive="True"
                     IsMuted="{x:Bind ViewModel.HasImage, Mode=OneWay}" />
 
-                <!--  The captured image shares the ambient's exact region (fills the whole card) so
-                      zoom/pan crops at the card edge, never at an inset. It still reads as floating:
-                      it's lifted with a drop shadow and the ambient shows through around it.  -->
+                <!--  The image fills the whole card so zoom/pan crops at the card edge, not an inset.  -->
                 <ctrl:ZoomableImage
                     x:Name="PreviewImageControl"
                     Source="{x:Bind ViewModel.Preview, Mode=OneWay}" />
 
-                <!--  Only the floating UI (pills, error banner, progress) is inset from the card edge.  -->
+                <!--  Floating UI (command bars, error banner, progress), inset from the card edge.  -->
                 <Grid Padding="{StaticResource PreviewSurfacePadding}">
 
-                    <!--  Command pill, top-left. The menu changes the mode; the pill body captures.  -->
+                    <!--  Capture, top-left. The menu picks the mode; the button body captures.  -->
                     <Border
                         x:Name="CommandBar"
                         Margin="{StaticResource FloatingToolbarMargin}"
@@ -116,9 +113,8 @@
                         </SplitButton>
                     </Border>
 
-                    <!--  Open-folder pill, top-right (mirrors the Capture pill). Opens the captures folder;
-                          on every auto-save its folder icon briefly flips to a green check — that animation
-                          IS the "saved" feedback (no toast).  -->
+                    <!--  Open Folder, top-right. Opens the captures folder; its icon flips to a
+                          green check on each auto-save (see the SavedFeedback storyboard above).  -->
                     <Border
                         x:Name="OpenFolderBar"
                         Margin="{StaticResource FloatingToolbarMargin}"
@@ -152,7 +148,7 @@
                         </Button>
                     </Border>
 
-                    <!--  Dismissible error surface (bottom).  -->
+                    <!--  Error banner (bottom), dismissible.  -->
                     <InfoBar
                         x:Name="ErrorInfoBar"
                         Margin="{StaticResource ContentPadding}"

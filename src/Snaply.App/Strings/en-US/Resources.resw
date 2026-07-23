@@ -2,41 +2,15 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
-  <data name="CaptureButton.Content" xml:space="preserve"><value>Capture region</value></data>
-  <data name="CaptureButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Capture screenshot</value></data>
   <data name="CaptureRegion" xml:space="preserve"><value>Capture region</value></data>
   <data name="CaptureWindow" xml:space="preserve"><value>Capture window</value></data>
   <data name="CaptureDesktop" xml:space="preserve"><value>Capture desktop</value></data>
   <data name="RegionCaptureItem.Text" xml:space="preserve"><value>Region</value></data>
   <data name="WindowCaptureItem.Text" xml:space="preserve"><value>Window</value></data>
   <data name="DesktopCaptureItem.Text" xml:space="preserve"><value>Entire desktop</value></data>
-  <data name="CopyButton.Label" xml:space="preserve"><value>Copy</value></data>
-  <data name="SaveAsButton.Label" xml:space="preserve"><value>Save as</value></data>
-  <data name="OpenFolderButton.Label" xml:space="preserve"><value>Open folder</value></data>
-  <data name="FitButton.Label" xml:space="preserve"><value>Fit</value></data>
-  <data name="ActualSizeButton.Label" xml:space="preserve"><value>100%</value></data>
-  <data name="PreviewScroller.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Screenshot preview area</value></data>
+  <data name="OpenFolderLabel" xml:space="preserve"><value>Open folder</value></data>
   <data name="PreviewImage.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Beautified screenshot preview</value></data>
-  <data name="StatusText.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Capture status</value></data>
-  <data name="BusyIndicator.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Capture in progress</value></data>
-  <data name="EmptyStateTitle.Text" xml:space="preserve"><value>Capture a screenshot</value></data>
-  <data name="EmptyStateBody.Text" xml:space="preserve"><value>Choose a region, window, or the entire virtual desktop.</value></data>
-  <data name="SaveAsCommit" xml:space="preserve"><value>Save</value></data>
-  <data name="PngFiles" xml:space="preserve"><value>PNG image</value></data>
-  <data name="StatusReady" xml:space="preserve"><value>Ready.</value></data>
-  <data name="StatusCapturingRegion" xml:space="preserve"><value>Select a region.</value></data>
-  <data name="StatusCapturingWindow" xml:space="preserve"><value>Select a window or display.</value></data>
-  <data name="StatusCapturingDesktop" xml:space="preserve"><value>Capturing the desktop.</value></data>
-  <data name="StatusSavedCopied" xml:space="preserve"><value>Saved to Pictures\Screenshots\Snaply and copied.</value></data>
-  <data name="StatusSavedOnly" xml:space="preserve"><value>Saved, but clipboard copy failed. Copy is available.</value></data>
-  <data name="StatusCopiedOnly" xml:space="preserve"><value>Copied, but automatic save failed. Save as is available.</value></data>
-  <data name="StatusExportFailed" xml:space="preserve"><value>Preview ready. Automatic save and copy failed; both remain available.</value></data>
-  <data name="StatusCopied" xml:space="preserve"><value>Copied.</value></data>
-  <data name="StatusSaved" xml:space="preserve"><value>Saved.</value></data>
-  <data name="StatusCancelled" xml:space="preserve"><value>Capture cancelled.</value></data>
   <data name="ErrorCapture" xml:space="preserve"><value>Couldn't capture the selected content.</value></data>
-  <data name="ErrorClipboard" xml:space="preserve"><value>Couldn't copy the screenshot.</value></data>
-  <data name="ErrorSave" xml:space="preserve"><value>Couldn't save the screenshot.</value></data>
   <data name="ErrorOpenFolder" xml:space="preserve"><value>Couldn't open the screenshots folder.</value></data>
   <data name="RegionHint" xml:space="preserve"><value>Drag to select · Esc to cancel</value></data>
   <data name="RegionCancel" xml:space="preserve"><value>Cancel</value></data>

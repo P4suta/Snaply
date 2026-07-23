@@ -409,23 +409,13 @@ function Wait-CaptureComplete {
 
 foreach ($id in @(
     'CaptureButton',
-    'CopyButton',
-    'SaveAsButton',
-    'OpenFolderButton',
-    'PreviewScroller',
-    'StatusText'
+    'OpenFolderButton'
 )) {
     Test-Ui "$id exists" {
         Wait-AppElement $id | Out-Null
     }
 }
 
-Test-Ui 'Copy disabled before capture' {
-    Wait-AppElement CopyButton IsEnabled $false | Out-Null
-}
-Test-Ui 'Save As disabled before capture' {
-    Wait-AppElement SaveAsButton IsEnabled $false | Out-Null
-}
 Test-Ui 'Open Folder enabled before capture' {
     Wait-AppElement OpenFolderButton IsEnabled $true | Out-Null
 }
@@ -490,15 +480,7 @@ Test-Ui 'Region capture completes' {
     }
 
     Wait-AppElement CaptureButton IsEnabled $true 20000 | Out-Null
-    try {
-        Wait-AppElement PreviewImage IsOffscreen $false 3000 | Out-Null
-    }
-    catch {
-        $statusElement = Get-AppElement StatusText
-        $status = $statusElement.GetCurrentPattern(
-            [System.Windows.Automation.TextPattern]::Pattern).DocumentRange.GetText(-1)
-        throw "Region capture produced no preview. Status: $status"
-    }
+    Wait-AppElement PreviewImage IsOffscreen $false 3000 | Out-Null
 }
 
 Test-Ui 'Window picker cancellation recovers' {
@@ -612,12 +594,6 @@ Test-Ui 'Desktop capture completes' {
     Invoke-CaptureMode DesktopCaptureItem
     Wait-CaptureComplete
 }
-Test-Ui 'Copy enabled after capture' {
-    Wait-AppElement CopyButton IsEnabled $true | Out-Null
-}
-Test-Ui 'Save As enabled after capture' {
-    Wait-AppElement SaveAsButton IsEnabled $true | Out-Null
-}
 Test-Ui 'Automatic save created a PNG' {
     $deadline = [DateTime]::UtcNow.AddSeconds(5)
     do {
@@ -637,37 +613,9 @@ Test-Ui 'Automatic save created a PNG' {
         throw 'No automatic save appeared.'
     }
 }
-Test-Ui 'Copy places a bitmap on the clipboard' {
-    (Get-AppElement 'CopyButton').
-        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
-        Invoke()
-    Start-Sleep -Milliseconds 200
+Test-Ui 'Capture places a bitmap on the clipboard' {
     if (-not [System.Windows.Forms.Clipboard]::ContainsImage()) {
         throw 'Clipboard contains no image.'
-    }
-}
-Test-Ui 'Save As writes the retained PNG' {
-    $saveAsPath = Join-Path $artifacts 'save-as.png'
-    Remove-Item -LiteralPath $saveAsPath -Force -ErrorAction SilentlyContinue
-    (Get-AppElement 'SaveAsButton').
-        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
-        Invoke()
-    Start-Sleep -Seconds 1
-    [System.Windows.Forms.SendKeys]::SendWait($saveAsPath)
-    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    while (-not (Test-Path -LiteralPath $saveAsPath) -and [DateTime]::UtcNow -lt $deadline) {
-        Start-Sleep -Milliseconds 100
-    }
-    if (-not (Test-Path -LiteralPath $saveAsPath)) {
-        throw 'Save As did not create the file.'
-    }
-
-    $header = [System.IO.File]::ReadAllBytes($saveAsPath)[0..7]
-    $signature = [BitConverter]::ToString($header).Replace('-', '')
-    if ($signature -ne '89504E470D0A1A0A') {
-        throw 'Save As output is not a PNG.'
     }
 }
 Test-Ui 'Open Folder opens the automatic-save directory' {

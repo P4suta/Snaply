@@ -91,7 +91,10 @@ internal sealed class ImageExportService
     internal void OpenCaptureDirectory()
     {
         Directory.CreateDirectory(_captureDirectory);
-        Process.Start(new ProcessStartInfo("explorer.exe", _captureDirectory)
+        // Shell-execute the directory itself rather than passing it as an explorer.exe argument:
+        // an unquoted path that contains a space (e.g. a redirected Pictures folder) would be
+        // misparsed and open the wrong location.
+        Process.Start(new ProcessStartInfo(_captureDirectory)
         {
             UseShellExecute = true,
         });

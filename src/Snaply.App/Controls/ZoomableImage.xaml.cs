@@ -12,18 +12,16 @@ using Windows.Foundation;
 namespace Snaply.Controls;
 
 /// <summary>
-/// A self-contained zoom/pan image viewer. The image is laid out <see cref="Stretch.Uniform"/>
-/// so at scale <c>1.0</c> it already fits the viewport (the "fit" baseline); the element's
-/// Composition <see cref="Visual.Scale"/>/<see cref="Visual.Offset"/> then scale/translate from
-/// there. Mouse-wheel zooms about the cursor, left-drag pans, double-tap resets to fit, and a
-/// floating fit-to-view button (bottom-right) resets the zoom.
+/// A zoom/pan image viewer. The image is laid out <see cref="Stretch.Uniform"/>, so at scale
+/// <c>1.0</c> it fits the viewport (the fit baseline and the scale floor); the element's Composition
+/// <see cref="Visual.Scale"/>/<see cref="Visual.Offset"/> scale and translate from there. Mouse-wheel
+/// zooms about the cursor, left-drag pans, and double-tap resets to fit.
 /// </summary>
 /// <remarks>
-/// Zoom (wheel, Fit, double-tap) glides via GPU-composited spring animations, so rapid consecutive
-/// notches retarget smoothly from the current in-flight value instead of snapping. Panning writes
-/// the offset directly so the drag stays 1:1 with the cursor. The <c>_scale</c>/<c>_translateX</c>/
-/// <c>_translateY</c> fields always hold the <em>target</em> state, so the cursor-anchor math stays
-/// pixel-correct at rest.
+/// Zoom glides via GPU-composited spring animations, so rapid consecutive notches retarget from the
+/// in-flight value instead of snapping. Panning writes the offset directly to stay 1:1 with the
+/// cursor. The <c>_scale</c>/<c>_translateX</c>/<c>_translateY</c> fields always hold the
+/// <em>target</em> state, so the cursor-anchor math stays pixel-correct at rest.
 /// </remarks>
 internal sealed partial class ZoomableImage : UserControl
 {
@@ -34,8 +32,8 @@ internal sealed partial class ZoomableImage : UserControl
         typeof(ZoomableImage),
         new PropertyMetadata(null, OnSourceChanged));
 
-    // Zoom limits and per-notch multiplier. Scale is relative to the fit baseline (1.0), which is
-    // also the floor: Fit is as small as it gets — the wheel only zooms in, never below Fit.
+    // Zoom limits. Scale is relative to the fit baseline (1.0), which is also the floor: the wheel
+    // only zooms in, never below fit.
     private const double MinScale = 1.0;
     private const double MaxScale = 8.0;
     private const double ZoomStep = 1.1;

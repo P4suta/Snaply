@@ -1,21 +1,35 @@
 # Snaply
 
-Snaply captures a region, window, or the complete virtual desktop and automatically presents it on a randomized, image-aware gradient background.
+Snaply is a Windows screenshot tool. It captures a region, a window, or the
+entire virtual desktop, then places the capture on a randomized, image-derived
+gradient background.
 
-After each capture, Snaply opens a preview, copies one PNG to the clipboard, and saves the same image to `Pictures\Screenshots\Snaply`. Copy, Save As, and Open Folder remain available from the preview.
+After each capture, Snaply opens a preview, copies a PNG to the clipboard, and
+saves the same PNG to `Pictures\Screenshots\Snaply`.
 
-## Use
+## Usage
 
-1. Choose Region, Window, or Desktop from Capture.
-2. For Region, drag across one or more displays. For Window, choose from the Windows picker.
-3. Use Copy, Save As, Open Folder, Fit, or 100% as needed.
-
-Keyboard shortcuts: `Ctrl+N`, `Ctrl+C`, `Ctrl+Shift+S`, `Ctrl+0`, `Ctrl+1`, and `Esc`.
+1. Open the Capture menu and choose Region, Window, or Desktop.
+2. For Region, drag to select across one or more displays. For Window, pick
+   from the system window picker.
+3. In the preview, scroll to zoom, drag to pan, and double-tap to fit. Use
+   Open Folder to open the save location.
 
 ## Install
 
-Download the signed MSIX bundle or the self-contained x64/ARM64 portable ZIP from [GitHub Releases](https://github.com/P4suta/Snaply/releases). Portable builds require no .NET or Windows App SDK installation; extract the ZIP and run `Snaply.exe`.
+Download the signed MSIX bundle or the self-contained x64/ARM64 portable ZIP
+from [GitHub Releases](https://github.com/P4suta/Snaply/releases). Portable
+builds require no .NET or Windows App SDK installation: extract the ZIP and run
+`Snaply.exe`.
 
-Snaply supports Windows 11 24H2 or later on x64 and ARM64 in English, Japanese, and Simplified Chinese.
+Snaply runs on Windows 11 24H2 or later on x64 and ARM64, in English, Japanese,
+and Simplified Chinese.
 
-Snaply works entirely on the local machine. It has no telemetry, network access, background service, tray process, global hotkey, or updater.
+## Privacy
+
+Snaply runs entirely on the local machine. It has no telemetry, network access,
+background service, tray process, global hotkey, or updater.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

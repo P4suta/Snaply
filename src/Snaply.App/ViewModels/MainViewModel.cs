@@ -12,7 +12,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly ScreenCaptureService _capture;
     private readonly ImageExportService _export;
     private CancellationTokenSource? _operation;
-    private RenderedImage? _image;
 
     [ObservableProperty]
     internal partial WriteableBitmap? Preview { get; set; }
@@ -28,9 +27,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     internal partial string ErrorMessage { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    internal partial string StatusMessage { get; set; } = ResourceText.Get("StatusReady");
 
     // Bumped on each successful automatic save; the view watches it to play the folder→green-check
     // "saved" animation (that flip IS the save feedback — there is no toast).
@@ -57,12 +53,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
         LastCaptureMode = mode;
         HasError = false;
         IsBusy = true;
-        StatusMessage = ResourceText.Get(mode switch
-        {
-            CaptureMode.Region => "StatusCapturingRegion",
-            CaptureMode.Window => "StatusCapturingWindow",
-            _ => "StatusCapturingDesktop",
-        });
         using var operation = new CancellationTokenSource();
         _operation = operation;
 
@@ -71,37 +61,25 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
             using CapturedFrame? frame = await _capture.CaptureAsync(mode, operation.Token);
             if (frame is null)
             {
-                StatusMessage = ResourceText.Get("StatusCancelled");
                 return;
             }
 
             RenderedImage image = await BeautifyRenderer.RenderAsync(frame, operation.Token);
             WriteableBitmap preview = await UpdatePreviewAsync(Preview, image, operation.Token);
-            _image = image;
             Preview = preview;
             HasImage = true;
 
             Task<bool> save = TrySaveAutomaticallyAsync(image, operation.Token);
             Task<bool> copy = TryCopyAsync(image, operation.Token);
             await Task.WhenAll(save, copy);
-            bool saved = await save;
-            bool copied = await copy;
-            if (saved)
+            if (await save)
             {
                 SavedTick++;
             }
-
-            StatusMessage = ResourceText.Get((saved, copied) switch
-            {
-                (true, true) => "StatusSavedCopied",
-                (true, false) => "StatusSavedOnly",
-                (false, true) => "StatusCopiedOnly",
-                _ => "StatusExportFailed",
-            });
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = ResourceText.Get("StatusCancelled");
+            // Cancellation (Esc, or the window picker dismissed) is a normal outcome — nothing to surface.
         }
         catch (Exception exception)
         {
@@ -211,7 +189,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         ErrorMessage = ResourceText.Get(key);
         HasError = true;
-        StatusMessage = ErrorMessage;
     }
 
     private static void LogFailure(string operation, Exception exception) =>
