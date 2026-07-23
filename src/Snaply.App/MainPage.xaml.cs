@@ -1,7 +1,5 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
-using Windows.System;
 
 namespace Snaply;
 
@@ -11,8 +9,6 @@ public sealed partial class MainPage : Page
     private const int RegionGlyph = 0xEF20;
     private const int WindowGlyph = 0xE737;
     private const int DesktopGlyph = 0xE7F4;
-
-    private bool _acceleratorsInstalled;
 
     // The mode the Capture pill runs. The flyout only changes this (it never captures on its own);
     // pressing the pill body captures with it. Defaults to the whole desktop.
@@ -31,7 +27,6 @@ public sealed partial class MainPage : Page
                 DispatcherQueue.TryEnqueue(() => SavedFeedback.Begin());
             }
         };
-        Loaded += (_, _) => InstallAccelerators();
     }
 
     internal MainViewModel ViewModel { get; }
@@ -71,36 +66,5 @@ public sealed partial class MainPage : Page
             CaptureMode.Window => WindowGlyph,
             _ => DesktopGlyph,
         });
-    }
-
-    private void InstallAccelerators()
-    {
-        if (_acceleratorsInstalled)
-        {
-            return;
-        }
-
-        _acceleratorsInstalled = true;
-        KeyboardAccelerators.Add(CreateAccelerator(VirtualKey.N, VirtualKeyModifiers.Control, async () =>
-            await ViewModel.CaptureAsync(_selectedMode)));
-        KeyboardAccelerators.Add(CreateAccelerator(VirtualKey.Escape, VirtualKeyModifiers.None, () =>
-        {
-            ViewModel.Cancel();
-            return Task.CompletedTask;
-        }));
-    }
-
-    private static KeyboardAccelerator CreateAccelerator(
-        VirtualKey key,
-        VirtualKeyModifiers modifiers,
-        Func<Task> action)
-    {
-        var accelerator = new KeyboardAccelerator { Key = key, Modifiers = modifiers };
-        accelerator.Invoked += async (_, args) =>
-        {
-            args.Handled = true;
-            await action();
-        };
-        return accelerator;
     }
 }
