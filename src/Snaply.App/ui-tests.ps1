@@ -624,7 +624,38 @@ Test-Ui 'Region cancellation recovers' {
     Wait-AppElement CaptureButton IsEnabled $true 3000 | Out-Null
 }
 
-Test-Ui 'Region capture completes' {
+# Whether a synthetic press actually reaches the overlay depends on who holds the
+# foreground at that instant, and on these runners the shell reclaims it unpredictably —
+# every deterministic fix so far moved the failure rather than removing it. Retry the
+# whole gesture, as Invoke-CaptureMode already does for the same reason.
+function Invoke-RegionDrag {
+    $lastError = $null
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        try {
+            Invoke-RegionDragOnce
+            return
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            [WindowSizing]::SendMouse(0x0004) | Out-Null
+            try {
+                (Wait-ProcessElement RegionCancelButton 1000).
+                    GetCurrentPattern(
+                    [System.Windows.Automation.InvokePattern]::Pattern).
+                    Invoke()
+            }
+            catch {
+                # No overlay left standing; nothing to dismiss before the next attempt.
+            }
+
+            Start-Sleep -Milliseconds 200
+        }
+    }
+
+    throw $lastError
+}
+
+function Invoke-RegionDragOnce {
     Invoke-CaptureMode RegionCaptureItem
     $null = Wait-ProcessElement RegionCancelButton
     $null = Wait-RegionOverlayForeground
@@ -668,6 +699,10 @@ Test-Ui 'Region capture completes' {
 
     Wait-AppElement CaptureButton IsEnabled $true 20000 | Out-Null
     Wait-AppElement PreviewImage IsOffscreen $false 3000 | Out-Null
+}
+
+Test-Ui 'Region capture completes' {
+    Invoke-RegionDrag
 }
 
 Test-Ui 'Window picker cancellation recovers' {
