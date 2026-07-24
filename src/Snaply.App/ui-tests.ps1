@@ -103,6 +103,58 @@ public static class WindowSizing
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint count, Input[] inputs, int size);
 
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint attach, uint attachTo, bool join);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    // SetForegroundWindow alone is refused when another process owns the foreground, which
+    // is the normal state on these runners — the shell (WWAHost, SearchHost) keeps taking
+    // it. Attaching our input queue to both the current foreground thread and the target's
+    // lifts that restriction for the duration of the call, which is the documented way to
+    // hand the foreground to a specific window.
+    public static bool ForceForeground(IntPtr hWnd)
+    {
+        IntPtr foreground = GetForegroundWindow();
+        if (foreground == hWnd)
+        {
+            return true;
+        }
+
+        uint ignored;
+        uint foregroundThread = GetWindowThreadProcessId(foreground, out ignored);
+        uint targetThread = GetWindowThreadProcessId(hWnd, out ignored);
+        uint currentThread = GetCurrentThreadId();
+        bool attachedForeground = foregroundThread != 0 && foregroundThread != currentThread
+            && AttachThreadInput(currentThread, foregroundThread, true);
+        bool attachedTarget = targetThread != 0 && targetThread != currentThread
+            && AttachThreadInput(currentThread, targetThread, true);
+        try
+        {
+            BringWindowToTop(hWnd);
+            return SetForegroundWindow(hWnd);
+        }
+        finally
+        {
+            if (attachedTarget)
+            {
+                AttachThreadInput(currentThread, targetThread, false);
+            }
+
+            if (attachedForeground)
+            {
+                AttachThreadInput(currentThread, foregroundThread, false);
+            }
+        }
+    }
+
     public static bool SendMouse(uint flags)
     {
         Input[] inputs =
@@ -234,6 +286,17 @@ function Wait-RegionOverlayForeground {
             $foreground -ne $mainHandle -and
             $foregroundProcess -eq $AppPid) {
             return $foreground
+        }
+
+        # The shell keeps grabbing the foreground on these runners, and the app cannot
+        # activate over another process that holds it. Hand it to the overlay explicitly
+        # rather than waiting for a window that will never come forward on its own.
+        try {
+            $overlayHandle = [IntPtr](Get-RegionSelectionWindow).Current.NativeWindowHandle
+            $null = [WindowSizing]::ForceForeground($overlayHandle)
+        }
+        catch {
+            # Still on its way up; keep polling until the deadline.
         }
 
         Start-Sleep -Milliseconds 25
