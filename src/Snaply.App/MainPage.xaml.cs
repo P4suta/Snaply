@@ -11,10 +11,6 @@ public sealed partial class MainPage : Page
     private const int WindowGlyph = 0xE737;
     private const int DesktopGlyph = 0xE7F4;
 
-    // The mode the Capture pill runs. The flyout only changes this (it never captures on its own);
-    // pressing the pill body captures with it. Defaults to the whole desktop.
-    private CaptureMode _selectedMode = CaptureMode.Desktop;
-
     internal MainPage(MainViewModel viewModel)
     {
         ViewModel = viewModel;
@@ -39,11 +35,8 @@ public sealed partial class MainPage : Page
 
     internal MainViewModel ViewModel { get; }
 
-    // Capture pill body: run the currently selected mode.
-    private async void CaptureButton_Click(SplitButton sender, SplitButtonClickEventArgs args) =>
-        await ViewModel.CaptureAsync(_selectedMode);
-
-    // Flyout items: change the selected mode only (the capture happens on the pill body click).
+    // Flyout items: change the selected mode only. The pill body is bound to CaptureCommand,
+    // which runs whichever mode is selected.
     private void RegionCaptureItem_Click(object sender, RoutedEventArgs args) => SelectMode(CaptureMode.Region);
 
     private void WindowCaptureItem_Click(object sender, RoutedEventArgs args) => SelectMode(CaptureMode.Window);
@@ -54,7 +47,7 @@ public sealed partial class MainPage : Page
 
     private void SelectMode(CaptureMode mode)
     {
-        _selectedMode = mode;
+        ViewModel.SelectedMode = mode;
         UpdatePrimaryCapture();
     }
 
@@ -62,13 +55,17 @@ public sealed partial class MainPage : Page
     // view model stays free of presentation strings.
     private void UpdatePrimaryCapture()
     {
-        PrimaryCaptureLabel.Text = ResourceText.Get(_selectedMode switch
+        string label = ResourceText.Get(ViewModel.SelectedMode switch
         {
             CaptureMode.Region => "CaptureRegion",
             CaptureMode.Window => "CaptureWindow",
             _ => "CaptureDesktop",
         });
-        PrimaryCaptureGlyph.Glyph = char.ConvertFromUtf32(_selectedMode switch
+        PrimaryCaptureLabel.Text = label;
+        // The pill's content is a panel, so it derives no automation name of its own and
+        // screen readers announce it unnamed. Name it after the mode it will run.
+        AutomationProperties.SetName(CaptureButton, label);
+        PrimaryCaptureGlyph.Glyph = char.ConvertFromUtf32(ViewModel.SelectedMode switch
         {
             CaptureMode.Region => RegionGlyph,
             CaptureMode.Window => WindowGlyph,

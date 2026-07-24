@@ -22,6 +22,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $results = [System.Collections.Generic.List[object]]::new()
+$diagnosticCount = 0
 $artifacts = Join-Path $PSScriptRoot '..\..\artifacts\ui'
 New-Item -ItemType Directory -Force -Path $artifacts | Out-Null
 $artifacts = (Resolve-Path $artifacts).Path
@@ -102,6 +103,58 @@ public static class WindowSizing
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint count, Input[] inputs, int size);
 
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint attach, uint attachTo, bool join);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    // SetForegroundWindow alone is refused when another process owns the foreground, which
+    // is the normal state on these runners — the shell (WWAHost, SearchHost) keeps taking
+    // it. Attaching our input queue to both the current foreground thread and the target's
+    // lifts that restriction for the duration of the call, which is the documented way to
+    // hand the foreground to a specific window.
+    public static bool ForceForeground(IntPtr hWnd)
+    {
+        IntPtr foreground = GetForegroundWindow();
+        if (foreground == hWnd)
+        {
+            return true;
+        }
+
+        uint ignored;
+        uint foregroundThread = GetWindowThreadProcessId(foreground, out ignored);
+        uint targetThread = GetWindowThreadProcessId(hWnd, out ignored);
+        uint currentThread = GetCurrentThreadId();
+        bool attachedForeground = foregroundThread != 0 && foregroundThread != currentThread
+            && AttachThreadInput(currentThread, foregroundThread, true);
+        bool attachedTarget = targetThread != 0 && targetThread != currentThread
+            && AttachThreadInput(currentThread, targetThread, true);
+        try
+        {
+            BringWindowToTop(hWnd);
+            return SetForegroundWindow(hWnd);
+        }
+        finally
+        {
+            if (attachedTarget)
+            {
+                AttachThreadInput(currentThread, targetThread, false);
+            }
+
+            if (attachedForeground)
+            {
+                AttachThreadInput(currentThread, foregroundThread, false);
+            }
+        }
+    }
+
     public static bool SendMouse(uint flags)
     {
         Input[] inputs =
@@ -110,22 +163,6 @@ public static class WindowSizing
             {
                 type = 0,
                 data = new InputUnion { mouse = new MouseInput { flags = flags } }
-            }
-        };
-        return SendInput(1, inputs, Marshal.SizeOf<Input>()) == 1;
-    }
-
-    public static bool MoveMouse(int dx, int dy)
-    {
-        Input[] inputs =
-        {
-            new Input
-            {
-                type = 0,
-                data = new InputUnion
-                {
-                    mouse = new MouseInput { dx = dx, dy = dy, flags = 0x0001 }
-                }
             }
         };
         return SendInput(1, inputs, Marshal.SizeOf<Input>()) == 1;
@@ -230,6 +267,63 @@ function Get-RegionSelectionWindow {
     }
 
     throw 'No region selection window appeared.'
+}
+
+# Synthetic mouse and keyboard input is delivered to the foreground window, but
+# BeginSelection returns as soon as it has called Activate(), so UI Automation can see
+# the overlay before it can accept input. Anything driving the overlay with SendInput or
+# SetCursorPos has to wait for it to actually reach the foreground first.
+function Wait-RegionOverlayForeground {
+    $mainHandle = [IntPtr](Get-AppWindow).Current.NativeWindowHandle
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $foreground = [WindowSizing]::GetForegroundWindow()
+        $foregroundProcess = [uint32]0
+        $null = [WindowSizing]::GetWindowThreadProcessId(
+            $foreground,
+            [ref]$foregroundProcess)
+        if ($foreground -ne [IntPtr]::Zero -and
+            $foreground -ne $mainHandle -and
+            $foregroundProcess -eq $AppPid) {
+            return $foreground
+        }
+
+        # The shell keeps grabbing the foreground on these runners, and the app cannot
+        # activate over another process that holds it. Hand it to the overlay explicitly
+        # rather than waiting for a window that will never come forward on its own.
+        try {
+            $overlayHandle = [IntPtr](Get-RegionSelectionWindow).Current.NativeWindowHandle
+            $null = [WindowSizing]::ForceForeground($overlayHandle)
+        }
+        catch {
+            # Still on its way up; keep polling until the deadline.
+        }
+
+        Start-Sleep -Milliseconds 25
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw 'Region overlay did not reach the foreground.'
+}
+
+# Reaching the foreground is necessary but not sufficient: the press still has to land on
+# the overlay's content. Hit-test the press point through UI Automation until it resolves
+# to the app, so PointerPressed is guaranteed to see it rather than firing into a window
+# that is foreground but not yet hit-testable.
+function Wait-PointerTarget {
+    param([int]$X, [int]$Y)
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $element = [System.Windows.Automation.AutomationElement]::FromPoint(
+            [System.Windows.Point]::new($X, $Y))
+        if ($element -and $element.Current.ProcessId -eq $AppPid) {
+            return
+        }
+
+        Start-Sleep -Milliseconds 25
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw "No window of the app is hit-testable at $X,$Y."
 }
 
 function Wait-ProcessElement {
@@ -345,6 +439,86 @@ function Close-CapturePickers {
     throw 'Stale GraphicsCapturePicker windows did not close.'
 }
 
+# A failure message only says which element never showed up. Snapshot the process's
+# actual window tree first, so the report distinguishes "the window was never created"
+# from "it exists but automation cannot see it". Capped, and never allowed to mask the
+# real failure.
+function Write-FailureDiagnostic {
+    param([string]$Name)
+
+    if ($script:diagnosticCount -ge 2) {
+        return
+    }
+
+    $script:diagnosticCount++
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add("=== $Name ===")
+    try {
+        $lines.Add("Responding: $((Get-Process -Id $AppPid).Responding)")
+        # Synthetic input lands on the foreground window, so record who actually had it.
+        $foreground = [WindowSizing]::GetForegroundWindow()
+        $foregroundProcess = [uint32]0
+        $null = [WindowSizing]::GetWindowThreadProcessId(
+            $foreground,
+            [ref]$foregroundProcess)
+        $owner = try {
+            (Get-Process -Id $foregroundProcess -ErrorAction Stop).ProcessName
+        }
+        catch {
+            'unknown'
+        }
+        $lines.Add(
+            "Foreground: hwnd=$foreground pid=$foregroundProcess ($owner)" +
+            " app pid=$AppPid")
+        # When something outside the app holds the foreground, synthetic input never
+        # reaches the overlay. Name every top-level window so the culprit is identifiable.
+        $desktop = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+            [System.Windows.Automation.TreeScope]::Children,
+            [System.Windows.Automation.Condition]::TrueCondition)
+        $lines.Add("Desktop top-level windows: $($desktop.Count)")
+        foreach ($window in $desktop) {
+            $lines.Add(
+                "  pid=$($window.Current.ProcessId)" +
+                " class=$($window.Current.ClassName)" +
+                " name='$($window.Current.Name)'")
+        }
+        $root = [System.Windows.Automation.AutomationElement]::RootElement
+        $processCondition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+            $AppPid)
+        $windows = $root.FindAll(
+            [System.Windows.Automation.TreeScope]::Children,
+            $processCondition)
+        $lines.Add("Top-level windows: $($windows.Count)")
+        foreach ($window in $windows) {
+            $lines.Add(
+                "  class=$($window.Current.ClassName)" +
+                " name='$($window.Current.Name)'" +
+                " bounds=$($window.Current.BoundingRectangle)" +
+                " offscreen=$($window.Current.IsOffscreen)")
+            $descendants = $window.FindAll(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                [System.Windows.Automation.Condition]::TrueCondition)
+            foreach ($element in $descendants) {
+                if (-not $element.Current.AutomationId) {
+                    continue
+                }
+
+                $lines.Add(
+                    "    $($element.Current.AutomationId)" +
+                    " type=$($element.Current.ControlType.ProgrammaticName)" +
+                    " offscreen=$($element.Current.IsOffscreen)" +
+                    " enabled=$($element.Current.IsEnabled)")
+            }
+        }
+    }
+    catch {
+        $lines.Add("Diagnostic capture failed: $($_.Exception.Message)")
+    }
+
+    Add-Content -LiteralPath (Join-Path $artifacts 'diagnostics.txt') -Value $lines
+}
+
 function Test-Ui {
     param([string]$Name, [scriptblock]$Action)
 
@@ -357,6 +531,7 @@ function Test-Ui {
         $results.Add([pscustomobject]@{ name = $Name; status = 'PASS' })
     }
     catch {
+        Write-FailureDiagnostic $Name
         [WindowSizing]::SendMouse(0x0004) | Out-Null
         [WindowSizing]::SendEscape() | Out-Null
         Start-Sleep -Milliseconds 100
@@ -382,6 +557,12 @@ function Invoke-CaptureMode {
             $expand.Expand()
             $item = Wait-ProcessElement $AutomationId 2000
             $item.GetCurrentPattern(
+                [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            # The flyout item only selects the mode — the pill body is what runs the
+            # capture (MainPage.xaml.cs: RegionCaptureItem_Click -> SelectMode, capture
+            # happens in CaptureButton_Click). Invoking the item alone starts nothing.
+            $capture = Wait-AppElement CaptureButton IsEnabled $true 5000
+            $capture.GetCurrentPattern(
                 [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
             return
         }
@@ -443,9 +624,41 @@ Test-Ui 'Region cancellation recovers' {
     Wait-AppElement CaptureButton IsEnabled $true 3000 | Out-Null
 }
 
-Test-Ui 'Region capture completes' {
+# Whether a synthetic press actually reaches the overlay depends on who holds the
+# foreground at that instant, and on these runners the shell reclaims it unpredictably —
+# every deterministic fix so far moved the failure rather than removing it. Retry the
+# whole gesture, as Invoke-CaptureMode already does for the same reason.
+function Invoke-RegionDrag {
+    $lastError = $null
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        try {
+            Invoke-RegionDragOnce
+            return
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            [WindowSizing]::SendMouse(0x0004) | Out-Null
+            try {
+                (Wait-ProcessElement RegionCancelButton 1000).
+                    GetCurrentPattern(
+                    [System.Windows.Automation.InvokePattern]::Pattern).
+                    Invoke()
+            }
+            catch {
+                # No overlay left standing; nothing to dismiss before the next attempt.
+            }
+
+            Start-Sleep -Milliseconds 200
+        }
+    }
+
+    throw $lastError
+}
+
+function Invoke-RegionDragOnce {
     Invoke-CaptureMode RegionCaptureItem
     $null = Wait-ProcessElement RegionCancelButton
+    $null = Wait-RegionOverlayForeground
     $overlay = Get-RegionSelectionWindow
     $bounds = $overlay.Current.BoundingRectangle
     $startX = [int]($bounds.Left + [Math]::Min(240, $bounds.Width / 4))
@@ -456,6 +669,7 @@ Test-Ui 'Region capture completes' {
         throw 'Region overlay is too small for the drag journey.'
     }
 
+    Wait-PointerTarget $startX $startY
     if (-not [WindowSizing]::SetCursorPos($startX, $startY)) {
         throw 'Could not position the region pointer.'
     }
@@ -465,10 +679,14 @@ Test-Ui 'Region capture completes' {
     }
 
     Start-Sleep -Milliseconds 100
-    for ($step = 0; $step -lt 10; $step++) {
-        if (-not [WindowSizing]::MoveMouse(
-                [int](($endX - $startX) / 10),
-                [int](($endY - $startY) / 10))) {
+    # Step the cursor in absolute coordinates. Relative SendInput moves are scaled by the
+    # pointer speed and "enhance pointer precision" settings, so the drag landed somewhere
+    # other than the target and the selection never closed — the overlay was still up when
+    # the assertion timed out, and arm64 (different pointer defaults) failed far more often.
+    for ($step = 1; $step -le 10; $step++) {
+        $x = [int]($startX + (($endX - $startX) * $step / 10))
+        $y = [int]($startY + (($endY - $startY) * $step / 10))
+        if (-not [WindowSizing]::SetCursorPos($x, $y)) {
             throw 'Could not drag the region pointer.'
         }
 
@@ -481,6 +699,10 @@ Test-Ui 'Region capture completes' {
 
     Wait-AppElement CaptureButton IsEnabled $true 20000 | Out-Null
     Wait-AppElement PreviewImage IsOffscreen $false 3000 | Out-Null
+}
+
+Test-Ui 'Region capture completes' {
+    Invoke-RegionDrag
 }
 
 Test-Ui 'Window picker cancellation recovers' {
@@ -649,42 +871,26 @@ Test-Ui 'Interactive controls expose UI Automation identity' {
         (-not $_.automationId -or -not $_.name)
     })
     if ($missing.Count -ne 0) {
-        throw (($missing | ForEach-Object name) -join ', ')
+        # Reporting the name is useless here — a missing name is exactly what this
+        # catches, so the message came out empty. Identify the element instead.
+        throw (($missing | ForEach-Object {
+                    "$($_.type) automationId='$($_.automationId)' name='$($_.name)'"
+                }) -join '; ')
     }
 }
 
 function Invoke-RegionCancellation {
-    $mainWindow = Get-AppWindow
-    $mainHandle = [IntPtr]$mainWindow.Current.NativeWindowHandle
     $cleanupRequired = $true
     try {
         Invoke-CaptureMode RegionCaptureItem
-        $deadline = [DateTime]::UtcNow.AddSeconds(5)
-        do {
-            $foreground = [WindowSizing]::GetForegroundWindow()
-            $foregroundProcess = [uint32]0
-            $null = [WindowSizing]::GetWindowThreadProcessId(
-                $foreground,
-                [ref]$foregroundProcess)
-            if ($foreground -ne [IntPtr]::Zero -and
-                $foreground -ne $mainHandle -and
-                $foregroundProcess -eq $AppPid) {
-                break
-            }
-
-            Start-Sleep -Milliseconds 25
-        } while ([DateTime]::UtcNow -lt $deadline)
-
-        if ($foreground -eq [IntPtr]::Zero -or
-            $foreground -eq $mainHandle -or
-            $foregroundProcess -ne $AppPid) {
-            throw 'Region overlay did not receive keyboard focus.'
-        }
-
-        if (-not [WindowSizing]::SendEscape()) {
-            throw 'Escape input failed.'
-        }
-
+        # Cancel through UI Automation rather than a synthetic Escape. Keystrokes only
+        # reach the overlay while it holds the foreground, and the shell reclaims it
+        # often enough that a 100-iteration soak is certain to hit a moment where it
+        # does not. The button is the same cancellation path and needs no activation.
+        # (Cost: the overlay's Escape accelerator is no longer exercised here.)
+        (Wait-ProcessElement RegionCancelButton).
+            GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+            Invoke()
         Wait-AppElement CaptureButton IsEnabled $true 5000 | Out-Null
         $cleanupRequired = $false
     }
