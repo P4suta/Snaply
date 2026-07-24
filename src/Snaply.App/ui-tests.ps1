@@ -848,11 +848,14 @@ function Invoke-RegionCancellation {
     $cleanupRequired = $true
     try {
         Invoke-CaptureMode RegionCaptureItem
-        $null = Wait-RegionOverlayForeground
-        if (-not [WindowSizing]::SendEscape()) {
-            throw 'Escape input failed.'
-        }
-
+        # Cancel through UI Automation rather than a synthetic Escape. Keystrokes only
+        # reach the overlay while it holds the foreground, and the shell reclaims it
+        # often enough that a 100-iteration soak is certain to hit a moment where it
+        # does not. The button is the same cancellation path and needs no activation.
+        # (Cost: the overlay's Escape accelerator is no longer exercised here.)
+        (Wait-ProcessElement RegionCancelButton).
+            GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+            Invoke()
         Wait-AppElement CaptureButton IsEnabled $true 5000 | Out-Null
         $cleanupRequired = $false
     }
