@@ -1,24 +1,13 @@
-# Normalize line endings so `dotnet format` (which enforces .editorconfig's
-# `end_of_line = crlf`) is consistent on every runner, while keeping the files
-# that must stay LF (CI shell / YAML — CRLF breaks bash `run:` blocks on Linux
-# runners) as LF.
-
-* text=auto
-
-# C# / MSBuild / XAML: CRLF, matching .editorconfig (what `dotnet format` checks).
-*.cs       text eol=crlf
-*.csproj   text eol=crlf
-*.props    text eol=crlf
-*.targets  text eol=crlf
-*.xaml     text eol=crlf
-*.resw     text eol=crlf
-*.manifest text eol=crlf
-*.slnx     text eol=crlf
-
-# CI must stay LF.
-*.yml  text eol=lf
-*.yaml text eol=lf
-*.sh   text eol=lf
+# Line endings: LF everywhere — in the blob and in the working tree, on every
+# platform. Git stores LF regardless, and .editorconfig's `end_of_line = lf`
+# (what CI's `dotnet format --verify-no-changes` enforces) matches it, so there
+# is exactly one convention to obey.
+#
+# The repo previously checked C#/MSBuild/XAML out as CRLF while CI shell and YAML
+# had to stay LF. That split cost more than it bought: tools that emit LF fought
+# the format gate, and a file that reached the blob with CRLF showed as modified
+# in every clone forever, which only `git add --renormalize` can clear.
+* text=auto eol=lf
 
 # Binary assets — never touch.
 *.png  binary
