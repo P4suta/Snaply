@@ -1044,7 +1044,17 @@ if ($SoakIterations -gt 0) {
             samples = $samples
         } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $artifacts 'soak-results.json')
 
-        if ($final.handles -gt $baseline.handles) {
+        # Handle count oscillates rather than climbs: across one 100-capture soak the
+        # samples ran 1154, 1160, 1158, 1175, 1172, 1163, 1177, 1180, 1161, 1163 —
+        # peaking at iteration 80 and falling back by 100, with private bytes ending
+        # where it started. Comparing the last sample against the baseline with no
+        # tolerance is therefore a coin toss on where that sample happens to land, and
+        # it was: the soak passed one nightly and failed the next with no code change.
+        # 5% (~58 handles here) clears a measured spread of ~26 while still catching any
+        # leak above roughly 0.8 handles per capture over the 70 measured iterations.
+        # soak-results.json keeps every sample, so a real trend stays diagnosable.
+        $handleLimit = [int][Math]::Ceiling($baseline.handles * 1.05)
+        if ($final.handles -gt $handleLimit) {
             throw "Handle count grew from $($baseline.handles) to $($final.handles)."
         }
 
