@@ -377,7 +377,27 @@ function Write-FailureDiagnostic {
         $null = [WindowSizing]::GetWindowThreadProcessId(
             $foreground,
             [ref]$foregroundProcess)
-        $lines.Add("Foreground: hwnd=$foreground pid=$foregroundProcess (app pid $AppPid)")
+        $owner = try {
+            (Get-Process -Id $foregroundProcess -ErrorAction Stop).ProcessName
+        }
+        catch {
+            'unknown'
+        }
+        $lines.Add(
+            "Foreground: hwnd=$foreground pid=$foregroundProcess ($owner)" +
+            " app pid=$AppPid")
+        # When something outside the app holds the foreground, synthetic input never
+        # reaches the overlay. Name every top-level window so the culprit is identifiable.
+        $desktop = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+            [System.Windows.Automation.TreeScope]::Children,
+            [System.Windows.Automation.Condition]::TrueCondition)
+        $lines.Add("Desktop top-level windows: $($desktop.Count)")
+        foreach ($window in $desktop) {
+            $lines.Add(
+                "  pid=$($window.Current.ProcessId)" +
+                " class=$($window.Current.ClassName)" +
+                " name='$($window.Current.Name)'")
+        }
         $root = [System.Windows.Automation.AutomationElement]::RootElement
         $processCondition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
