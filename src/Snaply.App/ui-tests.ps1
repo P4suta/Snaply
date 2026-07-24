@@ -242,6 +242,27 @@ function Wait-RegionOverlayForeground {
     throw 'Region overlay did not reach the foreground.'
 }
 
+# Reaching the foreground is necessary but not sufficient: the press still has to land on
+# the overlay's content. Hit-test the press point through UI Automation until it resolves
+# to the app, so PointerPressed is guaranteed to see it rather than firing into a window
+# that is foreground but not yet hit-testable.
+function Wait-PointerTarget {
+    param([int]$X, [int]$Y)
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $element = [System.Windows.Automation.AutomationElement]::FromPoint(
+            [System.Windows.Point]::new($X, $Y))
+        if ($element -and $element.Current.ProcessId -eq $AppPid) {
+            return
+        }
+
+        Start-Sleep -Milliseconds 25
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw "No window of the app is hit-testable at $X,$Y."
+}
+
 function Wait-ProcessElement {
     param(
         [string]$AutomationId,
@@ -554,6 +575,7 @@ Test-Ui 'Region capture completes' {
         throw 'Region overlay is too small for the drag journey.'
     }
 
+    Wait-PointerTarget $startX $startY
     if (-not [WindowSizing]::SetCursorPos($startX, $startY)) {
         throw 'Could not position the region pointer.'
     }

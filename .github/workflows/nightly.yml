@@ -57,6 +57,20 @@ jobs:
           --self-contained true
           -o build/native
           --no-restore
+      # The windows-11-arm image boots with a Microsoft-account sign-in prompt (hosted by
+      # WWAHost) already holding the foreground. Synthetic input goes to the foreground
+      # window, and an app cannot activate over another process that owns it, so Snaply's
+      # capture overlay never came forward and every input-driven journey failed there.
+      - name: Dismiss the runner's stray sign-in prompt
+        shell: pwsh
+        run: |
+          foreach ($process in @(Get-Process -Name WWAHost -ErrorAction SilentlyContinue)) {
+            Write-Host "Closing $($process.ProcessName) ($($process.Id))."
+            $null = $process.CloseMainWindow()
+            if (-not $process.WaitForExit(3000)) {
+              Stop-Process -Id $process.Id -Force
+            }
+          }
       - name: Repeat UI journeys five times
         shell: pwsh
         run: |
