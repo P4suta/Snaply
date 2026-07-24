@@ -217,6 +217,31 @@ function Get-RegionSelectionWindow {
     throw 'No region selection window appeared.'
 }
 
+# Synthetic mouse and keyboard input is delivered to the foreground window, but
+# BeginSelection returns as soon as it has called Activate(), so UI Automation can see
+# the overlay before it can accept input. Anything driving the overlay with SendInput or
+# SetCursorPos has to wait for it to actually reach the foreground first.
+function Wait-RegionOverlayForeground {
+    $mainHandle = [IntPtr](Get-AppWindow).Current.NativeWindowHandle
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $foreground = [WindowSizing]::GetForegroundWindow()
+        $foregroundProcess = [uint32]0
+        $null = [WindowSizing]::GetWindowThreadProcessId(
+            $foreground,
+            [ref]$foregroundProcess)
+        if ($foreground -ne [IntPtr]::Zero -and
+            $foreground -ne $mainHandle -and
+            $foregroundProcess -eq $AppPid) {
+            return $foreground
+        }
+
+        Start-Sleep -Milliseconds 25
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw 'Region overlay did not reach the foreground.'
+}
+
 function Wait-ProcessElement {
     param(
         [string]$AutomationId,
@@ -346,6 +371,13 @@ function Write-FailureDiagnostic {
     $lines.Add("=== $Name ===")
     try {
         $lines.Add("Responding: $((Get-Process -Id $AppPid).Responding)")
+        # Synthetic input lands on the foreground window, so record who actually had it.
+        $foreground = [WindowSizing]::GetForegroundWindow()
+        $foregroundProcess = [uint32]0
+        $null = [WindowSizing]::GetWindowThreadProcessId(
+            $foreground,
+            [ref]$foregroundProcess)
+        $lines.Add("Foreground: hwnd=$foreground pid=$foregroundProcess (app pid $AppPid)")
         $root = [System.Windows.Automation.AutomationElement]::RootElement
         $processCondition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
@@ -491,6 +523,7 @@ Test-Ui 'Region cancellation recovers' {
 Test-Ui 'Region capture completes' {
     Invoke-CaptureMode RegionCaptureItem
     $null = Wait-ProcessElement RegionCancelButton
+    $null = Wait-RegionOverlayForeground
     $overlay = Get-RegionSelectionWindow
     $bounds = $overlay.Current.BoundingRectangle
     $startX = [int]($bounds.Left + [Math]::Min(240, $bounds.Width / 4))
@@ -707,33 +740,10 @@ Test-Ui 'Interactive controls expose UI Automation identity' {
 }
 
 function Invoke-RegionCancellation {
-    $mainWindow = Get-AppWindow
-    $mainHandle = [IntPtr]$mainWindow.Current.NativeWindowHandle
     $cleanupRequired = $true
     try {
         Invoke-CaptureMode RegionCaptureItem
-        $deadline = [DateTime]::UtcNow.AddSeconds(5)
-        do {
-            $foreground = [WindowSizing]::GetForegroundWindow()
-            $foregroundProcess = [uint32]0
-            $null = [WindowSizing]::GetWindowThreadProcessId(
-                $foreground,
-                [ref]$foregroundProcess)
-            if ($foreground -ne [IntPtr]::Zero -and
-                $foreground -ne $mainHandle -and
-                $foregroundProcess -eq $AppPid) {
-                break
-            }
-
-            Start-Sleep -Milliseconds 25
-        } while ([DateTime]::UtcNow -lt $deadline)
-
-        if ($foreground -eq [IntPtr]::Zero -or
-            $foreground -eq $mainHandle -or
-            $foregroundProcess -ne $AppPid) {
-            throw 'Region overlay did not receive keyboard focus.'
-        }
-
+        $null = Wait-RegionOverlayForeground
         if (-not [WindowSizing]::SendEscape()) {
             throw 'Escape input failed.'
         }
