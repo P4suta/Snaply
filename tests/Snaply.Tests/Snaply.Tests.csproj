@@ -27,8 +27,16 @@
     <None Include="..\..\src\Snaply.App\Strings\**\Resources.resw"
           Link="Strings\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\src\Snaply.App\MainPage.xaml"
-          Link="Ui\MainPage.xaml"
+    <None Include="..\..\src\Snaply.App\**\*.xaml"
+          Exclude="..\..\src\Snaply.App\bin\**;..\..\src\Snaply.App\obj\**"
+          Link="Ui\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\Snaply.App\Package.appxmanifest"
+          Link="Ui\Package.appxmanifest"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\Snaply.App\**\*.cs"
+          Exclude="..\..\src\Snaply.App\bin\**;..\..\src\Snaply.App\obj\**"
+          Link="Source\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -99,7 +99,8 @@ $portable = Join-Path $release "portable\$Architecture\Snaply.exe"
 if (-not (Test-Path -LiteralPath $portable)) {
     throw "Portable executable is missing: $portable"
 }
-Invoke-Journey { Start-Process -FilePath $portable | Out-Null } 'Portable' $SoakIterations
+Invoke-Journey { Start-Process -FilePath $portable | Out-Null } 'Portable first launch' $SoakIterations
+Invoke-Journey { Start-Process -FilePath $portable | Out-Null } 'Portable relaunch' 0
 
 if ($PSVersionTable.PSEdition -eq 'Core') {
     Import-Module Appx -UseWindowsPowerShell
@@ -123,11 +124,16 @@ try {
     }
 
     $package = Get-AppxPackage -Name Snaply -ErrorAction Stop
-    Invoke-Journey {
+    $msixLaunch = {
         Start-Process explorer.exe "shell:AppsFolder\$($package.PackageFamilyName)!App"
-    } 'MSIX' 0
+    }
+    Invoke-Journey $msixLaunch 'MSIX first launch' 0
+    Invoke-Journey $msixLaunch 'MSIX relaunch' 0
 }
 finally {
     Get-AppxPackage -Name Snaply -ErrorAction SilentlyContinue |
         Remove-AppxPackage -ErrorAction Stop
+    if (Get-AppxPackage -Name Snaply -ErrorAction SilentlyContinue) {
+        throw 'Snaply remained installed after uninstall.'
+    }
 }

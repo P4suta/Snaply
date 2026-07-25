@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Snaply.Imaging;
 
@@ -10,26 +11,42 @@ internal sealed partial record MonitorSnapshot(nint Handle, PixelRect Bounds, bo
     internal static IReadOnlyList<MonitorSnapshot> Enumerate()
     {
         var monitors = new List<MonitorSnapshot>();
+        int monitorInfoError = 0;
 
         bool Callback(nint monitor, nint deviceContext, ref NativeRect bounds, nint data)
         {
             var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-            if (GetMonitorInfo(monitor, ref info))
+            if (!GetMonitorInfo(monitor, ref info))
             {
-                monitors.Add(new MonitorSnapshot(
-                    monitor,
-                    new PixelRect(
-                        info.Monitor.Left,
-                        info.Monitor.Top,
-                        checked(info.Monitor.Right - info.Monitor.Left),
-                        checked(info.Monitor.Bottom - info.Monitor.Top)),
-                    (info.Flags & MonitorInfoPrimary) != 0));
+                monitorInfoError = Marshal.GetLastPInvokeError();
+                return false;
             }
 
+            monitors.Add(new MonitorSnapshot(
+                monitor,
+                new PixelRect(
+                    info.Monitor.Left,
+                    info.Monitor.Top,
+                    checked(info.Monitor.Right - info.Monitor.Left),
+                    checked(info.Monitor.Bottom - info.Monitor.Top)),
+                (info.Flags & MonitorInfoPrimary) != 0));
             return true;
         }
 
-        if (!EnumDisplayMonitors(nint.Zero, nint.Zero, Callback, nint.Zero) || monitors.Count == 0)
+        bool enumerated = EnumDisplayMonitors(nint.Zero, nint.Zero, Callback, nint.Zero);
+        if (monitorInfoError != 0)
+        {
+            throw new Win32Exception(monitorInfoError, "A display could not be inspected.");
+        }
+
+        if (!enumerated)
+        {
+            throw new Win32Exception(
+                Marshal.GetLastPInvokeError(),
+                "Displays could not be enumerated.");
+        }
+
+        if (monitors.Count == 0)
         {
             throw new InvalidOperationException("No display is available.");
         }

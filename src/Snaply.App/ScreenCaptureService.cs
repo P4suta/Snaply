@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml;
@@ -11,23 +12,29 @@ namespace Snaply;
 internal sealed partial class ScreenCaptureService : IDisposable
 {
     private const uint WdaExcludeFromCapture = 0x00000011;
+    private const int CaptureSourceBytesPerPixel = 24;
+    private const int CompositeBytesPerPixel = 4;
+    private const int RenderInputBytesPerPixel = 8;
+    private const int RenderOutputBytesPerPixel = 16;
+    private const long MaximumCaptureBudgetBytes = 1_610_612_736;
     private static readonly Guid GraphicsCaptureItemId = new("79C3F95B-31F7-4EC2-A464-632EF5D30760");
     private static readonly TimeSpan FirstFrameTimeout = TimeSpan.FromSeconds(5);
+    private readonly Window _appWindow;
+    private readonly bool _captureExclusionEnabled;
     private readonly object _deviceLock = new();
     private readonly Dictionary<nint, MonitorCaptureItem> _monitorItems = [];
-    private readonly RegionSelectionService _regionSelection = new();
-    private CanvasDevice? _device = new();
-    private Window? _appWindow;
-    private bool _captureExclusionEnabled;
+    private readonly RegionSelectionService _regionSelection;
+    private CanvasDevice? _device;
     private bool _disposed;
 
-    internal void SetAppWindow(Window window, bool captureExclusionEnabled)
+    internal ScreenCaptureService(Window appWindow, bool captureExclusionEnabled)
     {
-        _appWindow = window;
+        _appWindow = appWindow;
         _captureExclusionEnabled = captureExclusionEnabled;
+        _regionSelection = new RegionSelectionService(ActivateOwner);
     }
 
-    internal async Task<CapturedFrame?> CaptureAsync(CaptureMode mode, CancellationToken cancellationToken)
+    internal Task<CapturedFrame?> CaptureAsync(CaptureMode mode, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!GraphicsCaptureSession.IsSupported())
@@ -37,9 +44,9 @@ internal sealed partial class ScreenCaptureService : IDisposable
 
         return mode switch
         {
-            CaptureMode.Window => await CapturePickedItemAsync(cancellationToken),
-            CaptureMode.Desktop => await CaptureDesktopAsync(cancellationToken),
-            CaptureMode.Region => await CaptureRegionAsync(cancellationToken),
+            CaptureMode.Window => CapturePickedItemAsync(cancellationToken),
+            CaptureMode.Desktop => CaptureDesktopAsync(cancellationToken),
+            CaptureMode.Region => CaptureRegionAsync(cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(mode)),
         };
     }
@@ -61,6 +68,39 @@ internal sealed partial class ScreenCaptureService : IDisposable
         }
     }
 
+    internal bool IsGraphicsDeviceLost(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is GraphicsDeviceLostException)
+            {
+                return true;
+            }
+
+            lock (_deviceLock)
+            {
+                if (_device?.IsDeviceLost(current.HResult) is true)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    internal void ResetGraphicsDevice()
+    {
+        CanvasDevice? device;
+        lock (_deviceLock)
+        {
+            device = _device;
+            _device = null;
+        }
+
+        device?.Dispose();
+    }
+
     private async Task<CapturedFrame?> CapturePickedItemAsync(CancellationToken cancellationToken)
     {
         var picker = new GraphicsCapturePicker();
@@ -73,10 +113,14 @@ internal sealed partial class ScreenCaptureService : IDisposable
             return null;
         }
 
+        ValidateSize(item.Size.Width, item.Size.Height);
+        ValidateCaptureBudget(
+            checked((long)item.Size.Width * item.Size.Height),
+            new PixelRect(0, 0, item.Size.Width, item.Size.Height));
         bool hidden = HideApp();
         try
         {
-            await WaitForHiddenAppAsync(hidden, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             CanvasBitmap bitmap = await CaptureItemAsSdrAsync(item, cancellationToken);
             return new CapturedFrame(bitmap);
         }
@@ -86,52 +130,29 @@ internal sealed partial class ScreenCaptureService : IDisposable
         }
     }
 
-    private async Task<CapturedFrame> CaptureDesktopAsync(CancellationToken cancellationToken)
+    private async Task<CapturedFrame?> CaptureDesktopAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<MonitorSnapshot> monitors = MonitorSnapshot.Enumerate();
         PixelRect desktop = PixelRect.Bounds(monitors.Select(static monitor => monitor.Bounds));
         ValidateSize(desktop.Width, desktop.Height);
+        ValidateCaptureBudget(monitors, desktop);
 
         bool hidden = HideApp();
         try
         {
-            await WaitForHiddenAppAsync(hidden, cancellationToken);
-            CanvasDevice device = GetDevice();
-            var target = new CanvasRenderTarget(
-                device,
-                desktop.Width,
-                desktop.Height,
-                96,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                CanvasAlphaMode.Premultiplied);
+            cancellationToken.ThrowIfCancellationRequested();
+            IReadOnlyList<CapturedMonitorBitmap> captures =
+                await CaptureMonitorBitmapsAsync(monitors, cancellationToken);
             try
             {
-                using CanvasDrawingSession drawing = target.CreateDrawingSession();
-                drawing.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
-
-                foreach (MonitorSnapshot monitor in monitors)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    using CanvasBitmap bitmap = await CaptureMonitorAsSdrAsync(
-                        monitor,
-                        cancellationToken);
-                    ValidateMonitorBitmap(bitmap, monitor);
-
-                    drawing.DrawImage(
-                        bitmap,
-                        new Rect(
-                            checked(monitor.Bounds.X - desktop.X),
-                            checked(monitor.Bounds.Y - desktop.Y),
-                            monitor.Bounds.Width,
-                            monitor.Bounds.Height));
-                }
-
-                return new CapturedFrame(target);
+                CapturedFrame frame = await Task.Run(
+                    () => ComposeCaptures(captures, desktop, cancellationToken),
+                    cancellationToken);
+                return frame;
             }
-            catch
+            finally
             {
-                target.Dispose();
-                throw;
+                DisposeCaptures(captures);
             }
         }
         finally
@@ -150,61 +171,78 @@ internal sealed partial class ScreenCaptureService : IDisposable
         }
 
         ValidateSize(region.Value.Width, region.Value.Height);
+        MonitorSnapshot[] intersecting = monitors
+            .Where(monitor => !monitor.Bounds.Intersect(region.Value).IsEmpty)
+            .ToArray();
+        if (intersecting.Length == 0)
+        {
+            throw new InvalidOperationException("The selected region is no longer available.");
+        }
+
+        ValidateCaptureBudget(intersecting, region.Value);
         bool hidden = HideApp();
         try
         {
-            await WaitForHiddenAppAsync(hidden, cancellationToken);
-            CanvasDevice device = GetDevice();
-            var target = new CanvasRenderTarget(
-                device,
-                region.Value.Width,
-                region.Value.Height,
-                96,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                CanvasAlphaMode.Premultiplied);
+            cancellationToken.ThrowIfCancellationRequested();
+            IReadOnlyList<CapturedMonitorBitmap> captures =
+                await CaptureMonitorBitmapsAsync(intersecting, cancellationToken);
             try
             {
-                using CanvasDrawingSession drawing = target.CreateDrawingSession();
-                drawing.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
-                bool drewMonitor = false;
-
-                foreach (MonitorSnapshot monitor in monitors)
-                {
-                    PixelRect intersection = monitor.Bounds.Intersect(region.Value);
-                    if (intersection.IsEmpty)
-                    {
-                        continue;
-                    }
-
-                    using CanvasBitmap bitmap = await CaptureMonitorAsSdrAsync(
-                        monitor,
-                        cancellationToken);
-                    ValidateMonitorBitmap(bitmap, monitor);
-                    PixelRect source = intersection.RelativeTo(monitor.Bounds);
-                    PixelRect destination = intersection.RelativeTo(region.Value);
-                    drawing.DrawImage(
-                        bitmap,
-                        ToRect(destination),
-                        ToRect(source));
-                    drewMonitor = true;
-                }
-
-                if (!drewMonitor)
-                {
-                    throw new InvalidOperationException("The selected region is no longer available.");
-                }
-
-                return new CapturedFrame(target);
+                CapturedFrame frame = await Task.Run(
+                    () => ComposeCaptures(captures, region.Value, cancellationToken),
+                    cancellationToken);
+                return frame;
             }
-            catch
+            finally
             {
-                target.Dispose();
-                throw;
+                DisposeCaptures(captures);
             }
         }
         finally
         {
             ShowAppIfHidden(hidden);
+        }
+    }
+
+    private CapturedFrame ComposeCaptures(
+        IReadOnlyList<CapturedMonitorBitmap> captures,
+        PixelRect output,
+        CancellationToken cancellationToken)
+    {
+        CanvasRenderTarget? target = new(
+            GetDevice(),
+            output.Width,
+            output.Height,
+            96,
+            DirectXPixelFormat.B8G8R8A8UIntNormalized,
+            CanvasAlphaMode.Premultiplied);
+        try
+        {
+            using CanvasDrawingSession drawing = target.CreateDrawingSession();
+            drawing.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            foreach (CapturedMonitorBitmap capture in captures)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ValidateMonitorBitmap(capture.Bitmap, capture.Monitor);
+                PixelRect intersection = capture.Monitor.Bounds.Intersect(output);
+                if (intersection.IsEmpty)
+                {
+                    continue;
+                }
+
+                drawing.DrawImage(
+                    capture.Bitmap,
+                    ToRect(intersection.RelativeTo(output)),
+                    ToRect(intersection.RelativeTo(capture.Monitor.Bounds)));
+            }
+
+            var result = new CapturedFrame(target);
+            target = null;
+            return result;
+        }
+        finally
+        {
+            target?.Dispose();
         }
     }
 
@@ -240,7 +278,7 @@ internal sealed partial class ScreenCaptureService : IDisposable
         {
             Interlocked.Exchange(ref deviceLost, 1);
             InvalidateDevice(sender);
-            completion.TrySetException(new InvalidOperationException("The graphics device was lost."));
+            completion.TrySetException(new GraphicsDeviceLostException());
         }
 
         pool.FrameArrived += OnFrameArrived;
@@ -257,8 +295,17 @@ internal sealed partial class ScreenCaptureService : IDisposable
             session.StartCapture();
             using Direct3D11CaptureFrame frame = await completion.Task;
             ValidateSize(frame.ContentSize.Width, frame.ContentSize.Height);
+            ValidateCaptureBudget(
+                checked((long)frame.ContentSize.Width * frame.ContentSize.Height),
+                new PixelRect(
+                    0,
+                    0,
+                    frame.ContentSize.Width,
+                    frame.ContentSize.Height));
             using CanvasBitmap source = CanvasBitmap.CreateFromDirect3D11Surface(device, frame.Surface);
-            return ConvertToSdr(device, source, frame.ContentSize, cancellationToken);
+            return await Task.Run(
+                () => ConvertToSdr(device, source, frame.ContentSize, cancellationToken),
+                cancellationToken);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -334,6 +381,47 @@ internal sealed partial class ScreenCaptureService : IDisposable
         }
     }
 
+    private async Task<IReadOnlyList<CapturedMonitorBitmap>> CaptureMonitorBitmapsAsync(
+        IReadOnlyList<MonitorSnapshot> monitors,
+        CancellationToken cancellationToken)
+    {
+        using var concurrency = new SemaphoreSlim(Math.Min(monitors.Count, 4));
+        var completedCaptures = new ConcurrentBag<CapturedMonitorBitmap>();
+        Task<CapturedMonitorBitmap>[] tasks = monitors
+            .Select(async monitor =>
+            {
+                await concurrency.WaitAsync(cancellationToken);
+                try
+                {
+                    CanvasBitmap bitmap = await CaptureMonitorAsSdrAsync(
+                        monitor,
+                        cancellationToken);
+                    var capture = new CapturedMonitorBitmap(monitor, bitmap);
+                    completedCaptures.Add(capture);
+                    return capture;
+                }
+                finally
+                {
+                    concurrency.Release();
+                }
+            })
+            .ToArray();
+
+        try
+        {
+            return await Task.WhenAll(tasks);
+        }
+        catch
+        {
+            foreach (CapturedMonitorBitmap capture in completedCaptures)
+            {
+                capture.Bitmap.Dispose();
+            }
+
+            throw;
+        }
+    }
+
     private void InvalidateDevice(CanvasDevice device)
     {
         lock (_deviceLock)
@@ -376,11 +464,6 @@ internal sealed partial class ScreenCaptureService : IDisposable
 
     private bool HideApp()
     {
-        if (_appWindow is null)
-        {
-            return false;
-        }
-
         nint handle = WinRT.Interop.WindowNative.GetWindowHandle(_appWindow);
         if (_captureExclusionEnabled
             && GetWindowDisplayAffinity(handle, out uint affinity)
@@ -390,26 +473,23 @@ internal sealed partial class ScreenCaptureService : IDisposable
         }
 
         _appWindow.AppWindow.Hide();
-        _ = DwmFlush();
+        int result = DwmFlush();
+        if (result < 0)
+        {
+            _appWindow.AppWindow.Show();
+            _appWindow.Activate();
+            Marshal.ThrowExceptionForHR(result);
+        }
+
         return true;
     }
 
     private void ShowAppIfHidden(bool hidden)
     {
-        if (hidden && _appWindow is not null)
+        if (hidden && !_disposed)
         {
             _appWindow.AppWindow.Show();
             _appWindow.Activate();
-        }
-    }
-
-    private static async Task WaitForHiddenAppAsync(
-        bool hidden,
-        CancellationToken cancellationToken)
-    {
-        if (hidden)
-        {
-            await Task.Delay(100, cancellationToken);
         }
     }
 
@@ -421,7 +501,60 @@ internal sealed partial class ScreenCaptureService : IDisposable
             throw new ArgumentOutOfRangeException(nameof(width), "Capture dimensions are unsupported.");
         }
 
-        _ = checked((long)width * height * 8);
+        PixelSize rendered = BeautifyLayout.Compute(new PixelSize(width, height)).Canvas;
+        if (rendered.Width > maximum || rendered.Height > maximum)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(width),
+                "Capture dimensions leave no room for the rendered output.");
+        }
+
+        _ = checked((long)width * height);
+    }
+
+    private static void ValidateCaptureBudget(
+        IReadOnlyList<MonitorSnapshot> monitors,
+        PixelRect output)
+    {
+        long sourcePixels = monitors.Sum(
+            static monitor => checked((long)monitor.Bounds.Width * monitor.Bounds.Height));
+        ValidateCaptureBudget(sourcePixels, output);
+    }
+
+    private static void ValidateCaptureBudget(long sourcePixels, PixelRect output)
+    {
+        long outputPixels = output.Size.Area;
+        long renderedPixels = BeautifyLayout.Compute(output.Size).Canvas.Area;
+        long capturePeak = checked(
+            (sourcePixels * CaptureSourceBytesPerPixel)
+            + (outputPixels * CompositeBytesPerPixel));
+        long renderAndDeliveryPeak = checked(
+            (outputPixels * RenderInputBytesPerPixel)
+            + (renderedPixels * RenderOutputBytesPerPixel));
+        long estimatedBytes = Math.Max(capturePeak, renderAndDeliveryPeak);
+        GCMemoryInfo memory = GC.GetGCMemoryInfo();
+        long budget;
+        if (memory.HighMemoryLoadThresholdBytes > 0 && memory.MemoryLoadBytes > 0)
+        {
+            long headroom = Math.Max(
+                0,
+                memory.HighMemoryLoadThresholdBytes - memory.MemoryLoadBytes);
+            budget = Math.Min(MaximumCaptureBudgetBytes, headroom / 2);
+        }
+        else if (memory.TotalAvailableMemoryBytes > memory.TotalCommittedBytes)
+        {
+            long headroom = memory.TotalAvailableMemoryBytes - memory.TotalCommittedBytes;
+            budget = Math.Min(MaximumCaptureBudgetBytes, headroom / 2);
+        }
+        else
+        {
+            budget = MaximumCaptureBudgetBytes;
+        }
+
+        if (estimatedBytes > budget)
+        {
+            throw new InvalidOperationException("The requested capture exceeds the safe memory budget.");
+        }
     }
 
     private static void ValidateMonitorBitmap(CanvasBitmap bitmap, MonitorSnapshot monitor)
@@ -435,6 +568,22 @@ internal sealed partial class ScreenCaptureService : IDisposable
 
     private static Rect ToRect(PixelRect rectangle) =>
         new(rectangle.X, rectangle.Y, rectangle.Width, rectangle.Height);
+
+    private static void DisposeCaptures(IReadOnlyList<CapturedMonitorBitmap> captures)
+    {
+        foreach (CapturedMonitorBitmap capture in captures)
+        {
+            capture.Bitmap.Dispose();
+        }
+    }
+
+    private void ActivateOwner()
+    {
+        if (!_disposed)
+        {
+            _appWindow.Activate();
+        }
+    }
 
     private static GraphicsCaptureItem CreateItemForMonitor(nint monitor)
     {
@@ -451,6 +600,29 @@ internal sealed partial class ScreenCaptureService : IDisposable
     }
 
     private readonly record struct MonitorCaptureItem(PixelRect Bounds, GraphicsCaptureItem Item);
+
+    private readonly record struct CapturedMonitorBitmap(
+        MonitorSnapshot Monitor,
+        CanvasBitmap Bitmap);
+
+    private sealed class GraphicsDeviceLostException : InvalidOperationException
+    {
+        private const int DeviceRemoved = unchecked((int)0x887A0005);
+
+        internal GraphicsDeviceLostException()
+            : base("The graphics device was lost.")
+        {
+            HResult = DeviceRemoved;
+        }
+
+        public GraphicsDeviceLostException(string message) : base(message)
+        {
+        }
+
+        public GraphicsDeviceLostException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
+    }
 
     [ComImport]
     [Guid("3628E81B-3CAC-4C60-B7F4-23CE0E0C3356")]

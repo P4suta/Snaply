@@ -75,12 +75,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "The release commit is not in main."
           }
-          [xml]$props = Get-Content Directory.Build.props -Raw
-          if ("v$($props.Project.PropertyGroup.Version)" -ne $env:TAG) {
+          $version = (Get-Content version.txt -Raw).Trim()
+          if ("v$version" -ne $env:TAG) {
             throw "The release tag does not match the project version."
           }
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
+          dotnet-version: 8.0.x
           global-json-file: global.json
           cache: true
           cache-dependency-path: "**/packages.lock.json"
@@ -95,15 +96,16 @@ jobs:
       - name: Generate SPDX SBOM
         shell: pwsh
         run: |
-          dotnet tool install --tool-path build/tools `
-            Microsoft.Sbom.DotNetTool --version 4.1.5
-          ./build/tools/sbom-tool generate `
+          dotnet tool restore
+          dotnet tool run sbom-tool -- generate `
             -b build/release `
             -bc . `
             -pn Snaply `
             -pv '${{ inputs.tag_name }}'.TrimStart('v') `
             -ps P4suta `
-            -nsb https://github.com/P4suta/Snaply
+            -nsb https://github.com/P4suta/Snaply `
+            -mi SPDX:2.2 `
+            -cd '--DirectoryExclusionList **/artifacts/** --DirectoryExclusionList **/build/**'
       - uses: taiki-e/install-action@7572810d7dd469b651bb7793945692cf78da5dd7 # v2.85.0
         with:
           tool: osv-scanner@2.3.6
@@ -297,6 +299,7 @@ jobs:
           ref: ${{ env.REF }}
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
+          dotnet-version: 8.0.x
           global-json-file: global.json
           cache: true
           cache-dependency-path: "**/packages.lock.json"

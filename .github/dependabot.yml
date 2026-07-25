@@ -33,6 +33,17 @@ updates:
     commit-message:
       prefix: build
 
+  - package-ecosystem: nuget
+    directory: /tests/Snaply.App.Tests
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      app-tests:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

@@ -2,16 +2,44 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
+  <data name="AppDisplayName" xml:space="preserve"><value>Snaply</value></data>
+  <data name="PublisherDisplayName" xml:space="preserve"><value>Snaply</value></data>
+  <data name="AppDescription" xml:space="preserve"><value>領域、ウィンドウ、デスクトップを撮影し、整えたPNGとして保存します。</value></data>
   <data name="CaptureRegion" xml:space="preserve"><value>領域を撮影</value></data>
   <data name="CaptureWindow" xml:space="preserve"><value>ウィンドウを撮影</value></data>
   <data name="CaptureDesktop" xml:space="preserve"><value>デスクトップを撮影</value></data>
+  <data name="CaptureButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>領域を撮影</value></data>
   <data name="RegionCaptureItem.Text" xml:space="preserve"><value>領域</value></data>
   <data name="WindowCaptureItem.Text" xml:space="preserve"><value>ウィンドウ</value></data>
   <data name="DesktopCaptureItem.Text" xml:space="preserve"><value>デスクトップ全体</value></data>
-  <data name="OpenFolderLabel" xml:space="preserve"><value>フォルダーを開く</value></data>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>スクリーンショットフォルダーを開く</value></data>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>スクリーンショットフォルダーを開く</value></data>
   <data name="PreviewImage.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>加工済みスクリーンショットのプレビュー</value></data>
+  <data name="PreviewErrorInfoBar.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>スクリーンショットのプレビュー エラー</value></data>
+  <data name="DeliveryInfoBar.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>スクリーンショットの出力状況</value></data>
+  <data name="PreviewScroller.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>ズーム可能なスクリーンショットのプレビュー</value></data>
+  <data name="EmptyStateTitle.Text" xml:space="preserve"><value>スクリーンショットを撮影</value></data>
+  <data name="EmptyStateBody.Text" xml:space="preserve"><value>領域、ウィンドウ、デスクトップから選択してください。撮影後は自動で保存・コピーします。</value></data>
+  <data name="CaptureProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>スクリーンショットを撮影中</value></data>
+  <data name="RetryOutputButton.Content" xml:space="preserve"><value>失敗した出力を再試行</value></data>
+  <data name="ZoomOutButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>縮小</value></data>
+  <data name="ZoomOutButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>縮小（Ctrl+-）</value></data>
+  <data name="ZoomInButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>拡大</value></data>
+  <data name="ZoomInButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>拡大（Ctrl++）</value></data>
+  <data name="FitButton.Content" xml:space="preserve"><value>全体表示</value></data>
+  <data name="FitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>画像全体をウィンドウに表示</value></data>
+  <data name="FitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>全体表示（Ctrl+0）</value></data>
+  <data name="ActualSizeButton.Content" xml:space="preserve"><value>100%</value></data>
+  <data name="ActualSizeButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>画像を実寸で表示</value></data>
+  <data name="ActualSizeButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>実寸表示（Ctrl+1）</value></data>
   <data name="ErrorCapture" xml:space="preserve"><value>選択した内容を撮影できませんでした。</value></data>
+  <data name="ErrorPreview" xml:space="preserve"><value>画像は出力されましたが、プレビューを表示できませんでした。</value></data>
   <data name="ErrorOpenFolder" xml:space="preserve"><value>スクリーンショットフォルダーを開けませんでした。</value></data>
-  <data name="RegionHint" xml:space="preserve"><value>ドラッグして選択 · Escでキャンセル</value></data>
-  <data name="RegionCancel" xml:space="preserve"><value>キャンセル</value></data>
+  <data name="StatusSavedAndCopied" xml:space="preserve"><value>保存してクリップボードへコピーしました。</value></data>
+  <data name="StatusSavedCopyFailed" xml:space="preserve"><value>保存しましたが、クリップボードへコピーできませんでした。</value></data>
+  <data name="StatusCopiedSaveFailed" xml:space="preserve"><value>コピーしましたが、PNGを保存できませんでした。</value></data>
+  <data name="StatusDeliveryFailed" xml:space="preserve"><value>スクリーンショットを保存もコピーもできませんでした。</value></data>
+  <data name="RegionHintText.Text" xml:space="preserve"><value>ドラッグして選択 · Escでキャンセル</value></data>
+  <data name="RegionSelectionOverlay.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>領域選択画面</value></data>
+  <data name="RegionCancelButton.Content" xml:space="preserve"><value>キャンセル</value></data>
 </root>

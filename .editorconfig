@@ -40,18 +40,3 @@ dotnet_diagnostic.CA1062.severity = none
 
 [src/Snaply.App/App.xaml.cs]
 dotnet_diagnostic.CA1515.severity = none
-
-[src/Snaply.App/MainWindow.xaml.cs]
-dotnet_diagnostic.CA1515.severity = none
-
-[src/Snaply.App/MainPage.xaml.cs]
-dotnet_diagnostic.CA1515.severity = none
-
-[src/Snaply.App/ViewModels/MainViewModel.cs]
-dotnet_diagnostic.CA1031.severity = none
-
-[src/Snaply.App/ImageExportService.cs]
-dotnet_diagnostic.CA1849.severity = none
-
-[src/Snaply.App/ScreenCaptureService.cs]
-dotnet_diagnostic.CA2000.severity = none

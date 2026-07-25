@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="Snaply.Controls.RegionSelectionOverlay"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    x:Uid="RegionSelectionOverlay"
+    AutomationProperties.AutomationId="RegionSelectionOverlay"
+    IsTabStop="True"
+    mc:Ignorable="d">
+
+    <UserControl.KeyboardAccelerators>
+        <KeyboardAccelerator Key="Escape" Invoked="Escape_Invoked" />
+    </UserControl.KeyboardAccelerators>
+
+    <Grid
+        x:Name="InputSurface"
+        Background="Transparent"
+        PointerCanceled="InputSurface_PointerCanceled"
+        PointerCaptureLost="InputSurface_PointerCaptureLost"
+        PointerMoved="InputSurface_PointerMoved"
+        PointerPressed="InputSurface_PointerPressed"
+        PointerReleased="InputSurface_PointerReleased">
+        <Canvas IsHitTestVisible="False">
+            <Grid
+                x:Name="SelectionVisual"
+                Visibility="Collapsed">
+                <Rectangle
+                    Stroke="{ThemeResource SelectionOuterStrokeBrush}"
+                    StrokeThickness="4" />
+                <Rectangle
+                    Margin="2"
+                    Stroke="{ThemeResource AccentFillColorDefaultBrush}"
+                    StrokeThickness="2" />
+            </Grid>
+        </Canvas>
+
+        <StackPanel
+            Margin="20"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Spacing="8">
+            <Border
+                Padding="12,8"
+                Background="{ThemeResource SelectionHintBackgroundBrush}"
+                CornerRadius="{StaticResource OverlayCornerRadius}">
+                <TextBlock
+                    x:Uid="RegionHintText"
+                    Foreground="{ThemeResource SelectionHintForegroundBrush}"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    TextWrapping="Wrap" />
+            </Border>
+            <Button
+                x:Name="CancelButton"
+                x:Uid="RegionCancelButton"
+                HorizontalAlignment="Left"
+                AutomationProperties.AutomationId="RegionCancelButton"
+                Click="CancelButton_Click" />
+        </StackPanel>
+    </Grid>
+</UserControl>

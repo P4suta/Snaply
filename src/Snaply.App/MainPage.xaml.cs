@@ -1,49 +1,67 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Serilog;
+using Windows.Storage.Streams;
 
 namespace Snaply;
 
-public sealed partial class MainPage : Page
+internal sealed partial class MainPage : Page, IDisposable
 {
-    // Segoe Fluent Icons glyph code points for the Capture pill, per selected mode.
     private const int RegionGlyph = 0xEF20;
     private const int WindowGlyph = 0xE737;
     private const int DesktopGlyph = 0xE7F4;
+    private int _previewGeneration;
+    private bool _disposed;
 
     internal MainPage(MainViewModel viewModel)
     {
         ViewModel = viewModel;
         InitializeComponent();
         UpdatePrimaryCapture();
-
-        // The Open Folder button is icon-only, so give it an accessible name and a tooltip.
-        // Kept in code-behind alongside the other presentation strings (the view model stays
-        // free of UI text).
-        string openFolder = ResourceText.Get("OpenFolderLabel");
-        AutomationProperties.SetName(OpenFolderButton, openFolder);
-        ToolTipService.SetToolTip(OpenFolderButton, openFolder);
-        ViewModel.PropertyChanged += (_, args) =>
-        {
-            // Each successful auto-save bumps SavedTick; play the folder→green-check flip.
-            if (args.PropertyName == nameof(MainViewModel.SavedTick))
-            {
-                DispatcherQueue.TryEnqueue(() => SavedFeedback.Begin());
-            }
-        };
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
     internal MainViewModel ViewModel { get; }
 
-    // Flyout items: change the selected mode only. The pill body is bound to CaptureCommand,
-    // which runs whichever mode is selected.
-    private void RegionCaptureItem_Click(object sender, RoutedEventArgs args) => SelectMode(CaptureMode.Region);
+    internal static Visibility NullToVisibility(object? value) =>
+        value is null ? Visibility.Visible : Visibility.Collapsed;
 
-    private void WindowCaptureItem_Click(object sender, RoutedEventArgs args) => SelectMode(CaptureMode.Window);
+    internal static Visibility BoolToVisibility(bool value) =>
+        value ? Visibility.Visible : Visibility.Collapsed;
 
-    private void DesktopCaptureItem_Click(object sender, RoutedEventArgs args) => SelectMode(CaptureMode.Desktop);
+    internal static InfoBarSeverity ToInfoBarSeverity(NoticeKind kind) =>
+        kind switch
+        {
+            NoticeKind.Success => InfoBarSeverity.Success,
+            NoticeKind.Warning => InfoBarSeverity.Warning,
+            NoticeKind.Error => InfoBarSeverity.Error,
+            _ => InfoBarSeverity.Informational,
+        };
 
-    private void OpenFolderButton_Click(object sender, RoutedEventArgs args) => ViewModel.OpenFolder();
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _previewGeneration++;
+    }
+
+    private void RegionCaptureItem_Click(object sender, RoutedEventArgs args) =>
+        SelectMode(CaptureMode.Region);
+
+    private void WindowCaptureItem_Click(object sender, RoutedEventArgs args) =>
+        SelectMode(CaptureMode.Window);
+
+    private void DesktopCaptureItem_Click(object sender, RoutedEventArgs args) =>
+        SelectMode(CaptureMode.Desktop);
 
     private void SelectMode(CaptureMode mode)
     {
@@ -51,8 +69,6 @@ public sealed partial class MainPage : Page
         UpdatePrimaryCapture();
     }
 
-    // Reflect the selected mode on the Capture pill (label + glyph). Kept in code-behind so the
-    // view model stays free of presentation strings.
     private void UpdatePrimaryCapture()
     {
         string label = ResourceText.Get(ViewModel.SelectedMode switch
@@ -62,8 +78,6 @@ public sealed partial class MainPage : Page
             _ => "CaptureDesktop",
         });
         PrimaryCaptureLabel.Text = label;
-        // The pill's content is a panel, so it derives no automation name of its own and
-        // screen readers announce it unnamed. Name it after the mode it will run.
         AutomationProperties.SetName(CaptureButton, label);
         PrimaryCaptureGlyph.Glyph = char.ConvertFromUtf32(ViewModel.SelectedMode switch
         {
@@ -71,5 +85,53 @@ public sealed partial class MainPage : Page
             CaptureMode.Window => WindowGlyph,
             _ => DesktopGlyph,
         });
+    }
+
+    private async void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(MainViewModel.PreviewImage))
+        {
+            return;
+        }
+
+        int generation = ++_previewGeneration;
+        RenderedImage? image = ViewModel.PreviewImage;
+        if (image is null)
+        {
+            PreviewImageControl.Source = null;
+            return;
+        }
+
+        try
+        {
+            using var stream = new InMemoryRandomAccessStream();
+            using Stream output = stream.AsStreamForWrite();
+            await output.WriteAsync(image.Png);
+            await output.FlushAsync();
+            stream.Seek(0);
+            var bitmap = new BitmapImage();
+            await bitmap.SetSourceAsync(stream);
+            if (!_disposed && generation == _previewGeneration)
+            {
+                PreviewImageControl.Source = bitmap;
+                PreviewErrorInfoBar.IsOpen = false;
+            }
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException
+            or COMException
+            or IOException
+            or InvalidOperationException)
+        {
+            Log.Warning(
+                "Preview failed {ExceptionType} {HResult}",
+                exception.GetType().FullName,
+                exception.HResult);
+            if (!_disposed && generation == _previewGeneration)
+            {
+                PreviewErrorInfoBar.Message = ResourceText.Get("ErrorPreview");
+                PreviewErrorInfoBar.IsOpen = true;
+            }
+        }
     }
 }

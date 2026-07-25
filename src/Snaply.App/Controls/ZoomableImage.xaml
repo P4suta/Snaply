@@ -4,38 +4,82 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:local="using:Snaply.Controls"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <!--  Transparent background so pointer events (wheel / drag) fire over empty areas too.  -->
-    <Grid
-        x:Name="Viewport"
-        Background="Transparent"
-        DoubleTapped="OnDoubleTapped"
-        PointerCanceled="OnPointerReleased"
-        PointerMoved="OnPointerMoved"
-        PointerPressed="OnPointerPressed"
-        PointerReleased="OnPointerReleased"
-        PointerWheelChanged="OnPointerWheelChanged"
-        SizeChanged="OnViewportSizeChanged">
+    <UserControl.KeyboardAccelerators>
+        <KeyboardAccelerator Key="Add" Modifiers="Control" Invoked="ZoomInAccelerator_Invoked" />
+        <KeyboardAccelerator Key="Subtract" Modifiers="Control" Invoked="ZoomOutAccelerator_Invoked" />
+        <KeyboardAccelerator Key="Number0" Modifiers="Control" Invoked="FitAccelerator_Invoked" />
+        <KeyboardAccelerator Key="Number1" Modifiers="Control" Invoked="ActualSizeAccelerator_Invoked" />
+    </UserControl.KeyboardAccelerators>
 
-        <!--  Zoom/pan are driven by Composition (element Scale/Offset) for GPU-smooth motion.
-              Centred + capped at the image's native size (set in code): a capture smaller than the
-              viewport shows at 100% instead of being upscaled, and the element wraps the content
-              tightly (no letterbox), which keeps panning symmetric on both axes.  -->
-        <Image
-            x:Name="DisplayImage"
-            x:Uid="PreviewImage"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            AutomationProperties.AutomationId="PreviewImage"
-            Stretch="Uniform">
-            <!--  Lifts the image off the ambient backdrop so it reads as floating. The Z depth that
-                  drives it is written with the pan/zoom Translation in code-behind.  -->
-            <Image.Shadow>
-                <ThemeShadow />
-            </Image.Shadow>
-        </Image>
+    <Grid>
+        <ScrollViewer
+            x:Name="Scroller"
+            x:Uid="PreviewScroller"
+            AutomationProperties.AutomationId="PreviewScroller"
+            DoubleTapped="Scroller_DoubleTapped"
+            HorizontalScrollBarVisibility="Auto"
+            HorizontalScrollMode="Enabled"
+            IsTabStop="True"
+            MaxZoomFactor="8"
+            MinZoomFactor="0.05"
+            SizeChanged="Scroller_SizeChanged"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Enabled"
+            ViewChanged="Scroller_ViewChanged"
+            ZoomMode="Enabled">
+            <Image
+                x:Name="DisplayImage"
+                x:Uid="PreviewImage"
+                AutomationProperties.AutomationId="PreviewImage"
+                HorizontalAlignment="Center"
+                ImageOpened="DisplayImage_ImageOpened"
+                Stretch="None"
+                VerticalAlignment="Center" />
+        </ScrollViewer>
+
+        <Border
+            x:Name="ZoomToolbar"
+            Margin="12"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Style="{StaticResource FloatingToolbarStyle}"
+            Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button
+                    x:Name="ZoomOutButton"
+                    x:Uid="ZoomOutButton"
+                    AutomationProperties.AutomationId="ZoomOutButton"
+                    Click="ZoomOutButton_Click">
+                    <FontIcon Glyph="&#xE738;" />
+                </Button>
+                <TextBlock
+                    x:Name="ZoomLevelText"
+                    MinWidth="48"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="ZoomLevelText"
+                    Text="100%"
+                    TextAlignment="Center" />
+                <Button
+                    x:Name="ZoomInButton"
+                    x:Uid="ZoomInButton"
+                    AutomationProperties.AutomationId="ZoomInButton"
+                    Click="ZoomInButton_Click">
+                    <FontIcon Glyph="&#xE710;" />
+                </Button>
+                <Button
+                    x:Name="FitButton"
+                    x:Uid="FitButton"
+                    AutomationProperties.AutomationId="FitButton"
+                    Click="FitButton_Click" />
+                <Button
+                    x:Name="ActualSizeButton"
+                    x:Uid="ActualSizeButton"
+                    AutomationProperties.AutomationId="ActualSizeButton"
+                    Click="ActualSizeButton_Click" />
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

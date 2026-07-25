@@ -35,12 +35,20 @@ internal static class BeautifyLayout
 
         int canvasWidth = checked(source.Width + (padding * 2));
         int canvasHeight = checked(source.Height + (padding * 2));
+        int shadowBlur = Math.Clamp(
+            (int)Math.Round(radius * 0.6, MidpointRounding.AwayFromZero),
+            4,
+            16);
+        int shadowOffset = Math.Clamp(
+            (int)Math.Round(radius * 0.4, MidpointRounding.AwayFromZero),
+            3,
+            12);
 
         return new BeautifyLayoutResult(
             new PixelSize(canvasWidth, canvasHeight),
             new PixelRect(padding, padding, source.Width, source.Height),
             radius,
-            Math.Max(16, radius * 2),
-            Math.Max(8, radius));
+            shadowBlur,
+            shadowOffset);
     }
 }

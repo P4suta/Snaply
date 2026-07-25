@@ -67,20 +67,3 @@ internal readonly record struct PixelRect(int X, int Y, int Width, int Height)
     private static PixelRect CreateChecked(long x, long y, long width, long height) =>
         new(checked((int)x), checked((int)y), checked((int)width), checked((int)height));
 }
-
-internal readonly record struct DipRect(double X, double Y, double Width, double Height)
-{
-    internal PixelRect ToPixels(double scale)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(scale, 0);
-
-        int left = RoundChecked(X * scale);
-        int top = RoundChecked(Y * scale);
-        int right = RoundChecked((X + Width) * scale);
-        int bottom = RoundChecked((Y + Height) * scale);
-        return new PixelRect(left, top, checked(right - left), checked(bottom - top));
-    }
-
-    private static int RoundChecked(double value) =>
-        checked((int)Math.Round(value, MidpointRounding.AwayFromZero));
-}

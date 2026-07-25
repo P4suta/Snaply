@@ -2,16 +2,44 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
+  <data name="AppDisplayName" xml:space="preserve"><value>Snaply</value></data>
+  <data name="PublisherDisplayName" xml:space="preserve"><value>Snaply</value></data>
+  <data name="AppDescription" xml:space="preserve"><value>捕获区域、窗口或桌面，并保存为美化后的PNG。</value></data>
   <data name="CaptureRegion" xml:space="preserve"><value>捕获区域</value></data>
   <data name="CaptureWindow" xml:space="preserve"><value>捕获窗口</value></data>
   <data name="CaptureDesktop" xml:space="preserve"><value>捕获桌面</value></data>
+  <data name="CaptureButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>捕获区域</value></data>
   <data name="RegionCaptureItem.Text" xml:space="preserve"><value>区域</value></data>
   <data name="WindowCaptureItem.Text" xml:space="preserve"><value>窗口</value></data>
   <data name="DesktopCaptureItem.Text" xml:space="preserve"><value>整个桌面</value></data>
-  <data name="OpenFolderLabel" xml:space="preserve"><value>打开文件夹</value></data>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>打开屏幕截图文件夹</value></data>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>打开屏幕截图文件夹</value></data>
   <data name="PreviewImage.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>美化后的屏幕截图预览</value></data>
+  <data name="PreviewErrorInfoBar.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>屏幕截图预览错误</value></data>
+  <data name="DeliveryInfoBar.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>屏幕截图输出状态</value></data>
+  <data name="PreviewScroller.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>可缩放的屏幕截图预览</value></data>
+  <data name="EmptyStateTitle.Text" xml:space="preserve"><value>捕获屏幕截图</value></data>
+  <data name="EmptyStateBody.Text" xml:space="preserve"><value>选择区域、窗口或桌面。Snaply会自动保存并复制。</value></data>
+  <data name="CaptureProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>正在捕获屏幕截图</value></data>
+  <data name="RetryOutputButton.Content" xml:space="preserve"><value>重试失败的输出</value></data>
+  <data name="ZoomOutButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>缩小</value></data>
+  <data name="ZoomOutButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>缩小（Ctrl+-）</value></data>
+  <data name="ZoomInButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>放大</value></data>
+  <data name="ZoomInButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>放大（Ctrl++）</value></data>
+  <data name="FitButton.Content" xml:space="preserve"><value>适应</value></data>
+  <data name="FitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>使图像适应窗口</value></data>
+  <data name="FitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>适应窗口（Ctrl+0）</value></data>
+  <data name="ActualSizeButton.Content" xml:space="preserve"><value>100%</value></data>
+  <data name="ActualSizeButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>按实际大小显示图像</value></data>
+  <data name="ActualSizeButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>实际大小（Ctrl+1）</value></data>
   <data name="ErrorCapture" xml:space="preserve"><value>无法捕获所选内容。</value></data>
+  <data name="ErrorPreview" xml:space="preserve"><value>屏幕截图已输出，但无法显示预览。</value></data>
   <data name="ErrorOpenFolder" xml:space="preserve"><value>无法打开屏幕截图文件夹。</value></data>
-  <data name="RegionHint" xml:space="preserve"><value>拖动以选择 · Esc取消</value></data>
-  <data name="RegionCancel" xml:space="preserve"><value>取消</value></data>
+  <data name="StatusSavedAndCopied" xml:space="preserve"><value>已保存并复制。</value></data>
+  <data name="StatusSavedCopyFailed" xml:space="preserve"><value>已保存，但无法复制到剪贴板。</value></data>
+  <data name="StatusCopiedSaveFailed" xml:space="preserve"><value>已复制，但无法保存PNG。</value></data>
+  <data name="StatusDeliveryFailed" xml:space="preserve"><value>无法保存或复制屏幕截图。</value></data>
+  <data name="RegionHintText.Text" xml:space="preserve"><value>拖动以选择 · Esc取消</value></data>
+  <data name="RegionSelectionOverlay.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>区域选择界面</value></data>
+  <data name="RegionCancelButton.Content" xml:space="preserve"><value>取消</value></data>
 </root>

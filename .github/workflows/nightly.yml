@@ -43,10 +43,17 @@ jobs:
           version: v0.3.1
       # Restore with ReadyToRun on so the crossgen2 runtime pack is fetched here; the
       # publish below runs --no-restore, so without it R2R fails (NETSDK1094).
-      - run: dotnet restore Snaply.slnx --locked-mode -p:PublishReadyToRun=true
+      - run: >-
+          dotnet restore Snaply.slnx
+          --locked-mode
+          -p:Platform=${{ matrix.platform }}
+          -p:PublishReadyToRun=true
       - run: dotnet test tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore
-      - if: matrix.architecture == 'x64'
-        run: dotnet test tests/Snaply.App.Tests/Snaply.App.Tests.csproj -c Release --no-restore
+      - run: >-
+          dotnet test tests/Snaply.App.Tests/Snaply.App.Tests.csproj
+          -c Release
+          -p:Platform=${{ matrix.platform }}
+          --no-restore
       - name: Publish native portable payload
         run: >-
           dotnet publish src/Snaply.App/Snaply.App.csproj
@@ -57,20 +64,7 @@ jobs:
           --self-contained true
           -o build/native
           --no-restore
-      # UI journeys are x64-only. On windows-11-arm the shell keeps the foreground for
-      # itself — the image boots with a Microsoft-account sign-in prompt (WWAHost), and
-      # closing it just hands the foreground to SearchHost — so the capture overlay never
-      # comes forward and synthetic input never reaches it. Even the AttachThreadInput
-      # handoff in ui-tests.ps1 loses that fight there, so the journeys measured the
-      # runner image rather than Snaply. arm64 still builds, unit-tests and publishes.
-      # One pass, not five. The first pass has never failed across every run of this
-      # work; a repeat pass fails perhaps half the time, and always the same way: the
-      # region drag's press lands (the overlay closes) but its moves do not register, so
-      # the selection is empty, CaptureAsync returns null and no preview appears. Three
-      # retries do not shake it off. The soak below still covers repetition — 100
-      # captures against one process — which is what the repeat passes were really for.
       - name: Run the UI journeys
-        if: matrix.architecture == 'x64'
         shell: pwsh
         run: |
           1..1 | ForEach-Object {
@@ -89,7 +83,6 @@ jobs:
             }
           }
       - name: Run 100-capture soak
-        if: matrix.architecture == 'x64'
         shell: pwsh
         run: |
           $process = Start-Process build/native/Snaply.exe -PassThru
@@ -109,10 +102,8 @@ jobs:
               Stop-Process -Id $process.Id -Force
             }
           }
-      # A UI failure otherwise reports only "element did not appear"; Snaply's own log
-      # carries the exception behind it, so ship it alongside the results.
       - name: Collect app logs
-        if: always() && matrix.architecture == 'x64'
+        if: always()
         shell: pwsh
         run: |
           $logs = Join-Path $env:LOCALAPPDATA 'Snaply\Logs'
@@ -131,8 +122,8 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path artifacts/ui/app-logs | Out-Null
           Copy-Item "$logs\*" artifacts/ui/app-logs -Recurse -Force
-      # Only reached when everything gating this architecture passed: on x64 that includes
-      # the UI journeys and the soak, on arm64 the build and the unit tests.
+      # Only reached when build, unit tests, UI journeys, and soak passed on the
+      # native runner for this architecture.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nightly-${{ matrix.architecture }}
@@ -140,12 +131,11 @@ jobs:
           retention-days: 14
           if-no-files-found: error
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always() && matrix.architecture == 'x64'
+        if: always()
         with:
           name: ui-${{ matrix.architecture }}
           path: artifacts/ui
           if-no-files-found: error
-
   mutation:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -186,6 +176,5 @@ jobs:
       - name: Build twice
         shell: pwsh
         run: |
-          [xml]$props = Get-Content Directory.Build.props -Raw
-          $version = "$($props.Project.PropertyGroup.Version)"
+          $version = (Get-Content version.txt -Raw).Trim()
           ./scripts/test-reproducibility.ps1 -Version $version

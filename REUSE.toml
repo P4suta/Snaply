@@ -1,0 +1,20 @@
+version = 1
+SPDX-PackageName = "Snaply"
+SPDX-PackageSupplier = "P4suta"
+SPDX-PackageDownloadLocation = "https://github.com/P4suta/Snaply"
+
+[[annotations]]
+path = ["*", "**/*"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 P4suta"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [
+    ".release-please-manifest.json",
+    "version.txt",
+    "**/packages.lock.json",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "CC0-1.0"
