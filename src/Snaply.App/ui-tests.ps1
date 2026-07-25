@@ -194,6 +194,53 @@ public static class WindowSizing
 }
 '@
 
+function Get-AutoSaveCount {
+    if (-not (Test-Path -LiteralPath $autoSaveDirectory)) {
+        return 0
+    }
+
+    return @(Get-ChildItem -LiteralPath $autoSaveDirectory -Filter 'Snaply-*.png' -File).Count
+}
+
+function Clear-TestClipboard {
+    $lastError = $null
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        try {
+            [System.Windows.Forms.Clipboard]::Clear()
+            return
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            Start-Sleep -Milliseconds (50 * ($attempt + 1))
+        }
+    }
+
+    throw "Could not clear the clipboard before capture. $lastError"
+}
+
+function Wait-NewDelivery {
+    param(
+        [int]$PreviousSaveCount,
+        [int]$Timeout = 5000
+    )
+
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($Timeout)
+    do {
+        $current = Get-AutoSaveCount
+        if ($current -gt $PreviousSaveCount -and
+            [System.Windows.Forms.Clipboard]::ContainsImage()) {
+            return
+        }
+
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+
+    throw (
+        "Capture delivery did not create a new PNG and clipboard image. " +
+        "Saves: $PreviousSaveCount -> $current; " +
+        "clipboard image: $([System.Windows.Forms.Clipboard]::ContainsImage()).")
+}
+
 function Get-AppWindow {
     $root = [System.Windows.Automation.AutomationElement]::RootElement
     $condition = [System.Windows.Automation.PropertyCondition]::new(
@@ -523,6 +570,7 @@ function Test-Ui {
     param([string]$Name, [scriptblock]$Action)
 
     try {
+        $global:LASTEXITCODE = 0
         & $Action
         if ($LASTEXITCODE -notin @(0, $null)) {
             throw "Exit code $LASTEXITCODE"
@@ -558,9 +606,8 @@ function Invoke-CaptureMode {
             $item = Wait-ProcessElement $AutomationId 2000
             $item.GetCurrentPattern(
                 [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-            # The flyout item only selects the mode — the pill body is what runs the
-            # capture (MainPage.xaml.cs: RegionCaptureItem_Click -> SelectMode, capture
-            # happens in CaptureButton_Click). Invoking the item alone starts nothing.
+            # The flyout item only selects the mode. Invoking the pill body then executes
+            # the bound CaptureCommand; invoking the menu item alone starts nothing.
             $capture = Wait-AppElement CaptureButton IsEnabled $true 5000
             $capture.GetCurrentPattern(
                 [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
@@ -582,10 +629,42 @@ function Invoke-PrimaryCapture {
 }
 
 function Wait-CaptureComplete {
-    param([int]$Timeout = 20000)
+    param(
+        [int]$PreviousSaveCount,
+        [int]$Timeout = 20000
+    )
 
     Wait-AppElement CaptureButton IsEnabled $true $Timeout | Out-Null
     Wait-AppElement PreviewImage IsOffscreen $false 3000 | Out-Null
+    Wait-NewDelivery $PreviousSaveCount 5000
+}
+
+function Save-StateScreenshot {
+    param([string]$Name)
+
+    $path = Join-Path $artifacts "$Architecture-$Name.png"
+    winapp ui screenshot -a $AppPid -o $path | Out-Null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $path)) {
+        throw "State screenshot '$Name' failed."
+    }
+}
+
+function Save-WindowScreenshot {
+    param(
+        [IntPtr]$WindowHandle,
+        [string]$Name
+    )
+
+    $path = Join-Path $artifacts "$Architecture-$Name.png"
+    winapp ui screenshot -w ([long]$WindowHandle) -o $path | Out-Null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $path)) {
+        throw "Window screenshot '$Name' failed."
+    }
+}
+
+Test-Ui 'Initial state screenshot' {
+    Wait-AppElement CaptureButton Exists $true 10000 | Out-Null
+    Save-StateScreenshot '01-initial'
 }
 
 foreach ($id in @(
@@ -610,6 +689,7 @@ Test-Ui 'Narrow window keeps capture reachable' {
     }
 
     Wait-AppElement CaptureButton IsOffscreen $false | Out-Null
+    Save-StateScreenshot '02-narrow'
     if (-not [WindowSizing]::SetWindowPos(
             $handle, [IntPtr]::Zero, 80, 80, 1100, 720, 0x0014)) {
         throw 'Window restore failed.'
@@ -618,9 +698,22 @@ Test-Ui 'Narrow window keeps capture reachable' {
 
 Test-Ui 'Region cancellation recovers' {
     Invoke-CaptureMode RegionCaptureItem
+    $selectionWindow = Get-RegionSelectionWindow
+    Save-WindowScreenshot ([IntPtr]$selectionWindow.Current.NativeWindowHandle) '03-region-overlay'
     (Wait-ProcessElement RegionCancelButton).
         GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
         Invoke()
+    Wait-AppElement CaptureButton IsEnabled $true 3000 | Out-Null
+}
+
+Test-Ui 'Region Escape cancellation recovers' {
+    Invoke-CaptureMode RegionCaptureItem
+    $null = Wait-ProcessElement RegionCancelButton
+    $null = Wait-RegionOverlayForeground
+    if (-not [WindowSizing]::SendEscape()) {
+        throw 'Could not send Escape to the region overlay.'
+    }
+
     Wait-AppElement CaptureButton IsEnabled $true 3000 | Out-Null
 }
 
@@ -656,6 +749,8 @@ function Invoke-RegionDrag {
 }
 
 function Invoke-RegionDragOnce {
+    $saveCount = Get-AutoSaveCount
+    Clear-TestClipboard
     Invoke-CaptureMode RegionCaptureItem
     $null = Wait-ProcessElement RegionCancelButton
     $null = Wait-RegionOverlayForeground
@@ -697,12 +792,12 @@ function Invoke-RegionDragOnce {
         throw 'Could not release the region pointer.'
     }
 
-    Wait-AppElement CaptureButton IsEnabled $true 20000 | Out-Null
-    Wait-AppElement PreviewImage IsOffscreen $false 3000 | Out-Null
+    Wait-CaptureComplete $saveCount
 }
 
 Test-Ui 'Region capture completes' {
     Invoke-RegionDrag
+    Save-StateScreenshot '04-region-captured'
 }
 
 Test-Ui 'Window picker cancellation recovers' {
@@ -763,6 +858,8 @@ Test-Ui 'Window capture completes' {
         }
 
         Close-CapturePickers
+        $saveCount = Get-AutoSaveCount
+        Clear-TestClipboard
         Invoke-CaptureMode WindowCaptureItem
         $root = [System.Windows.Automation.AutomationElement]::RootElement
         $itemCondition = [System.Windows.Automation.PropertyCondition]::new(
@@ -798,7 +895,8 @@ Test-Ui 'Window capture completes' {
 
         $accept.GetCurrentPattern(
             [System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-        Wait-CaptureComplete
+        Wait-CaptureComplete $saveCount
+        Save-StateScreenshot '05-window-captured'
     }
     finally {
         Close-CapturePickers
@@ -813,8 +911,116 @@ Test-Ui 'Window capture completes' {
 }
 
 Test-Ui 'Desktop capture completes' {
+    $saveCount = Get-AutoSaveCount
+    Clear-TestClipboard
     Invoke-CaptureMode DesktopCaptureItem
-    Wait-CaptureComplete
+    Wait-CaptureComplete $saveCount
+    Save-StateScreenshot '06-desktop-captured'
+}
+Test-Ui 'Successful delivery is announced' {
+    $status = Wait-AppElement DeliveryInfoBar IsOffscreen $false 5000
+    if ([string]::IsNullOrWhiteSpace($status.Current.Name)) {
+        throw 'The delivery status has no accessible announcement.'
+    }
+}
+Test-Ui 'Preview zoom controls work' {
+    foreach ($id in @(
+            'ZoomOutButton',
+            'ZoomInButton',
+            'FitButton',
+            'ActualSizeButton',
+            'ZoomLevelText')) {
+        Wait-AppElement $id IsOffscreen $false 3000 | Out-Null
+    }
+
+    (Get-AppElement 'ActualSizeButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    (Get-AppElement 'ZoomInButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    $zoom = (Get-AppElement 'ZoomLevelText').Current.Name
+    if ([string]::IsNullOrWhiteSpace($zoom) -or $zoom -eq '100%') {
+        throw "Zoom level did not change: '$zoom'."
+    }
+
+    (Get-AppElement 'FitButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    Save-StateScreenshot '07-zoom-fit'
+}
+Test-Ui 'Preview keyboard accelerators work' {
+    (Get-AppElement 'ActualSizeButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    $before = (Get-AppElement 'ZoomLevelText').Current.Name
+    $handle = [IntPtr](Get-AppWindow).Current.NativeWindowHandle
+    if (-not [WindowSizing]::ForceForeground($handle)) {
+        throw 'Could not focus the app for keyboard zoom.'
+    }
+
+    winapp ui send-keys 'ctrl+0' -a $AppPid --via send-input | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Ctrl+0 input failed.'
+    }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(3)
+    do {
+        $fit = (Get-AppElement 'ZoomLevelText').Current.Name
+        if ($fit -ne $before) {
+            break
+        }
+
+        Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($fit -eq $before) {
+        throw "Ctrl+0 did not fit the preview: '$fit'."
+    }
+
+    winapp ui send-keys 'ctrl+1' -a $AppPid --via send-input | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Ctrl+1 input failed.'
+    }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(3)
+    do {
+        $actual = (Get-AppElement 'ZoomLevelText').Current.Name
+        if ($actual -eq '100%') {
+            break
+        }
+
+        Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($actual -ne '100%') {
+        throw "Ctrl+1 did not restore actual size: '$actual'."
+    }
+}
+Test-Ui 'Preview touch zoom works' {
+    (Get-AppElement 'ActualSizeButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
+    $before = (Get-AppElement 'ZoomLevelText').Current.Name
+    winapp ui touch PreviewScroller -g stretch --distance 120 -a $AppPid | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Touch stretch input failed.'
+    }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(3)
+    do {
+        $after = (Get-AppElement 'ZoomLevelText').Current.Name
+        if ($after -ne $before) {
+            break
+        }
+
+        Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($after -eq $before) {
+        throw "Touch stretch did not zoom the preview: '$after'."
+    }
+
+    (Get-AppElement 'FitButton').
+        GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).
+        Invoke()
 }
 Test-Ui 'Automatic save created a PNG' {
     $deadline = [DateTime]::UtcNow.AddSeconds(5)
@@ -833,6 +1039,25 @@ Test-Ui 'Automatic save created a PNG' {
 
     if ($current -le $savesBeforeCapture) {
         throw 'No automatic save appeared.'
+    }
+
+    $latest = Get-ChildItem -LiteralPath $autoSaveDirectory -Filter 'Snaply-*.png' -File |
+        Sort-Object LastWriteTimeUtc, Name -Descending |
+        Select-Object -First 1
+    $bytes = [System.IO.File]::ReadAllBytes($latest.FullName)
+    if ($bytes.Length -lt 24 -or
+        [BitConverter]::ToString($bytes, 0, 8).Replace('-', '') -ne '89504E470D0A1A0A') {
+        throw "Automatic save is not a PNG: $($latest.FullName)"
+    }
+
+    $image = [System.Drawing.Image]::FromFile($latest.FullName)
+    try {
+        if ($image.Width -le 0 -or $image.Height -le 0) {
+            throw 'Automatic save has invalid dimensions.'
+        }
+    }
+    finally {
+        $image.Dispose()
     }
 }
 Test-Ui 'Capture places a bitmap on the clipboard' {
@@ -866,7 +1091,7 @@ Test-Ui 'Open Folder opens the automatic-save directory' {
 Test-Ui 'Interactive controls expose UI Automation identity' {
     $inspection = winapp ui inspect -a $AppPid --interactive --json | ConvertFrom-Json
     $missing = @($inspection.windows.elements | Where-Object {
-        $_.type -match 'Button|SplitButton' -and
+        $_.type -match 'Button|Image|InfoBar|MenuItem|ProgressRing|ScrollViewer|SplitButton' -and
         $_.name -notmatch 'Minimize|Maximize|Close|System|システム' -and
         (-not $_.automationId -or -not $_.name)
     })
@@ -911,6 +1136,8 @@ function Invoke-SoakStep {
         Invoke-RegionCancellation
     }
 
+    $saveCount = Get-AutoSaveCount
+    Clear-TestClipboard
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     if ($SoakCancellationInterval -gt 0 -and
         $Iteration % $SoakCancellationInterval -eq 0) {
@@ -920,7 +1147,7 @@ function Invoke-SoakStep {
         Invoke-PrimaryCapture
     }
 
-    Wait-CaptureComplete
+    Wait-CaptureComplete $saveCount
     $timer.Stop()
 
     if ($SoakResizeInterval -gt 0 -and
@@ -998,8 +1225,10 @@ if ($SoakIterations -gt 0) {
             Start-Sleep -Milliseconds 250
             if ($SoakCancellationInterval -gt 0) {
                 Invoke-RegionCancellation
+                $saveCount = Get-AutoSaveCount
+                Clear-TestClipboard
                 Invoke-CaptureMode DesktopCaptureItem
-                Wait-CaptureComplete
+                Wait-CaptureComplete $saveCount
             }
             else {
                 $null = Invoke-SoakStep 1

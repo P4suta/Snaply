@@ -4,9 +4,10 @@ using Serilog;
 
 namespace Snaply;
 
-public partial class App : Application
+public sealed partial class App : Application, IDisposable
 {
     private MainWindow? _window;
+    private bool _disposed;
 
     public App()
     {
@@ -14,24 +15,51 @@ public partial class App : Application
         UnhandledException += OnUnhandledException;
     }
 
-    internal static Window MainWindow { get; private set; } = null!;
-
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         ConfigureLogging();
 
-        var capture = new ScreenCaptureService();
-        var export = new ImageExportService();
-        var viewModel = new MainViewModel(capture, export);
-        _window = new MainWindow(viewModel, capture);
-        MainWindow = _window;
-        _window.Closed += (_, _) =>
+        try
         {
-            viewModel.Dispose();
-            capture.Dispose();
-            Log.CloseAndFlush();
-        };
-        _window.Activate();
+            _window = new MainWindow();
+            _window.Closed += OnWindowClosed;
+            _window.Activate();
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
+    }
+
+    public void Dispose()
+    {
+        DisposeCore(closeWindow: true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void DisposeCore(bool closeWindow)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        UnhandledException -= OnUnhandledException;
+        if (_window is not null)
+        {
+            _window.Closed -= OnWindowClosed;
+            if (closeWindow)
+            {
+                _window.Close();
+            }
+
+            _window.Dispose();
+            _window = null;
+        }
+
+        Log.CloseAndFlush();
     }
 
     private static void ConfigureLogging()
@@ -88,4 +116,7 @@ public partial class App : Application
             args.Exception.GetType().FullName,
             args.Exception.HResult);
     }
+
+    private void OnWindowClosed(object sender, WindowEventArgs args) =>
+        DisposeCore(closeWindow: false);
 }

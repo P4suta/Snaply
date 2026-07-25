@@ -1,15 +1,15 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.WindowsRuntime;
 using Serilog;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Streams;
 
 namespace Snaply;
 
-internal sealed class ImageExportService
+internal sealed class ImageExportService : IImageOutput
 {
+    private const int ClipboardCannotOpen = unchecked((int)0x800401D0);
     private readonly string _captureDirectory;
     private int _temporarySequence;
 
@@ -26,6 +26,28 @@ internal sealed class ImageExportService
 
     internal static string CreateSuggestedFileName(DateTimeOffset now) =>
         $"Snaply-{now.ToLocalTime():yyyy-MM-dd_HH-mm-ss}.png";
+
+    public async Task<DeliveryOutcome> DeliverAsync(
+        RenderedImage image,
+        DeliveryRequest request,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        if (request.IsEmpty)
+        {
+            throw new ArgumentException("At least one output target must be requested.", nameof(request));
+        }
+
+        Task<DeliveryResult> save = request.Save
+            ? TrySaveAutomaticallyAsync(image, now, cancellationToken)
+            : Task.FromResult(DeliveryResult.NotAttempted);
+        Task<DeliveryResult> copy = request.Clipboard
+            ? TryCopyAsync(image, cancellationToken)
+            : Task.FromResult(DeliveryResult.NotAttempted);
+        await Task.WhenAll(save, copy);
+        return new DeliveryOutcome(await save, await copy);
+    }
 
     internal async Task<string> SaveAutomaticallyAsync(
         RenderedImage image,
@@ -72,7 +94,9 @@ internal sealed class ImageExportService
             try
             {
                 using var stream = new InMemoryRandomAccessStream();
-                await stream.WriteAsync(image.Png.AsBuffer()).AsTask(cancellationToken);
+                using Stream output = stream.AsStreamForWrite();
+                await output.WriteAsync(image.Png, cancellationToken);
+                await output.FlushAsync(cancellationToken);
                 stream.Seek(0);
 
                 var package = new DataPackage();
@@ -81,23 +105,26 @@ internal sealed class ImageExportService
                 Clipboard.Flush();
                 return;
             }
-            catch (COMException) when (attempt < 2)
+            catch (COMException exception) when (
+                exception.HResult == ClipboardCannotOpen
+                && attempt < 2)
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(50 * (attempt + 1)), cancellationToken);
             }
         }
     }
 
-    internal void OpenCaptureDirectory()
+    public void OpenCaptureDirectory()
     {
         Directory.CreateDirectory(_captureDirectory);
-        // Shell-execute the directory itself rather than passing it as an explorer.exe argument:
-        // an unquoted path that contains a space (e.g. a redirected Pictures folder) would be
-        // misparsed and open the wrong location.
-        Process.Start(new ProcessStartInfo(_captureDirectory)
+        using Process? process = Process.Start(new ProcessStartInfo(_captureDirectory)
         {
             UseShellExecute = true,
         });
+        if (process is null)
+        {
+            throw new InvalidOperationException("The capture directory could not be opened.");
+        }
     }
 
     private static string GetDefaultCaptureDirectory()
@@ -113,7 +140,7 @@ internal sealed class ImageExportService
 
     private static async Task WriteNewFileAsync(
         string path,
-        byte[] bytes,
+        ReadOnlyMemory<byte> bytes,
         CancellationToken cancellationToken)
     {
         await using var stream = new FileStream(
@@ -125,7 +152,39 @@ internal sealed class ImageExportService
             FileOptions.Asynchronous | FileOptions.WriteThrough);
         await stream.WriteAsync(bytes, cancellationToken);
         await stream.FlushAsync(cancellationToken);
-        stream.Flush(true);
+    }
+
+    private async Task<DeliveryResult> TrySaveAutomaticallyAsync(
+        RenderedImage image,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _ = await SaveAutomaticallyAsync(image, now, cancellationToken);
+            return DeliveryResult.Succeeded;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogFailure("AutoSave", exception);
+            return DeliveryResult.Failed;
+        }
+    }
+
+    private static async Task<DeliveryResult> TryCopyAsync(
+        RenderedImage image,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await CopyAsync(image, cancellationToken);
+            return DeliveryResult.Succeeded;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogFailure("Clipboard", exception);
+            return DeliveryResult.Failed;
+        }
     }
 
     private static void DeleteTemporaryFile(string path)
@@ -142,4 +201,11 @@ internal sealed class ImageExportService
                 exception.HResult);
         }
     }
+
+    private static void LogFailure(string operation, Exception exception) =>
+        Log.Warning(
+            "{Operation} failed {ExceptionType} {HResult}",
+            operation,
+            exception.GetType().FullName,
+            exception.HResult);
 }

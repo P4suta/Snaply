@@ -2,16 +2,44 @@
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
+  <data name="AppDisplayName" xml:space="preserve"><value>Snaply</value></data>
+  <data name="PublisherDisplayName" xml:space="preserve"><value>Snaply</value></data>
+  <data name="AppDescription" xml:space="preserve"><value>Capture a region, window, or desktop and save a polished PNG.</value></data>
   <data name="CaptureRegion" xml:space="preserve"><value>Capture region</value></data>
   <data name="CaptureWindow" xml:space="preserve"><value>Capture window</value></data>
   <data name="CaptureDesktop" xml:space="preserve"><value>Capture desktop</value></data>
+  <data name="CaptureButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Capture region</value></data>
   <data name="RegionCaptureItem.Text" xml:space="preserve"><value>Region</value></data>
   <data name="WindowCaptureItem.Text" xml:space="preserve"><value>Window</value></data>
   <data name="DesktopCaptureItem.Text" xml:space="preserve"><value>Entire desktop</value></data>
-  <data name="OpenFolderLabel" xml:space="preserve"><value>Open folder</value></data>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open screenshots folder</value></data>
+  <data name="OpenFolderButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Open screenshots folder</value></data>
   <data name="PreviewImage.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Beautified screenshot preview</value></data>
+  <data name="PreviewErrorInfoBar.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Screenshot preview error</value></data>
+  <data name="DeliveryInfoBar.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Screenshot output status</value></data>
+  <data name="PreviewScroller.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Zoomable screenshot preview</value></data>
+  <data name="EmptyStateTitle.Text" xml:space="preserve"><value>Capture something</value></data>
+  <data name="EmptyStateBody.Text" xml:space="preserve"><value>Choose a region, window, or desktop. Snaply saves and copies it automatically.</value></data>
+  <data name="CaptureProgress.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Capturing screenshot</value></data>
+  <data name="RetryOutputButton.Content" xml:space="preserve"><value>Retry failed output</value></data>
+  <data name="ZoomOutButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Zoom out</value></data>
+  <data name="ZoomOutButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Zoom out (Ctrl+-)</value></data>
+  <data name="ZoomInButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Zoom in</value></data>
+  <data name="ZoomInButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Zoom in (Ctrl++)</value></data>
+  <data name="FitButton.Content" xml:space="preserve"><value>Fit</value></data>
+  <data name="FitButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Fit image to window</value></data>
+  <data name="FitButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Fit image to window (Ctrl+0)</value></data>
+  <data name="ActualSizeButton.Content" xml:space="preserve"><value>100%</value></data>
+  <data name="ActualSizeButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Show image at actual size</value></data>
+  <data name="ActualSizeButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Actual size (Ctrl+1)</value></data>
   <data name="ErrorCapture" xml:space="preserve"><value>Couldn't capture the selected content.</value></data>
+  <data name="ErrorPreview" xml:space="preserve"><value>The screenshot was delivered, but its preview couldn't be shown.</value></data>
   <data name="ErrorOpenFolder" xml:space="preserve"><value>Couldn't open the screenshots folder.</value></data>
-  <data name="RegionHint" xml:space="preserve"><value>Drag to select · Esc to cancel</value></data>
-  <data name="RegionCancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="StatusSavedAndCopied" xml:space="preserve"><value>Saved and copied.</value></data>
+  <data name="StatusSavedCopyFailed" xml:space="preserve"><value>Saved, but couldn't copy to the clipboard.</value></data>
+  <data name="StatusCopiedSaveFailed" xml:space="preserve"><value>Copied, but couldn't save the PNG.</value></data>
+  <data name="StatusDeliveryFailed" xml:space="preserve"><value>Couldn't save or copy the screenshot.</value></data>
+  <data name="RegionHintText.Text" xml:space="preserve"><value>Drag to select · Esc to cancel</value></data>
+  <data name="RegionSelectionOverlay.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Region selection surface</value></data>
+  <data name="RegionCancelButton.Content" xml:space="preserve"><value>Cancel</value></data>
 </root>

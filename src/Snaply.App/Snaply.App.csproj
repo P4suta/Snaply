@@ -9,11 +9,11 @@
     <SnaplyPackageManifest Condition="'$(SnaplyPackageManifest)' == ''">Package.appxmanifest</SnaplyPackageManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <DefaultLanguage>en-US</DefaultLanguage>
-    <SatelliteResourceLanguages>en-US;ja-JP;zh-Hans;zh-CN</SatelliteResourceLanguages>
+    <SatelliteResourceLanguages>en-US;ja-JP;zh-Hans</SatelliteResourceLanguages>
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
-    <Platform Condition="'$(Platform)' == ''">x64</Platform>
-    <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <RuntimeIdentifier Condition="'$(Platform)' != 'ARM64'">win-x64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
@@ -26,8 +26,12 @@
     <EnableMsixTooling Condition="'$(WindowsPackageType)' == 'MSIX'">true</EnableMsixTooling>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
+    <PublishTrimmed Condition="'$(Configuration)' == 'Release'">true</PublishTrimmed>
+    <TrimMode Condition="'$(PublishTrimmed)' == 'true'">full</TrimMode>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
-    <PublishTrimmed>false</PublishTrimmed>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>
@@ -40,10 +44,12 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.4.0" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.2.1" />
-    <PackageReference Include="Serilog" Version="4.3.0" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp"
+                      Version="0.5.0"
+                      PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.2" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
@@ -67,6 +73,15 @@
           Condition="'$(WindowsPackageType)' == 'MSIX'">
     <ItemGroup>
       <AppxPackagePayload Remove="@(AppxPackagePayload)" Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="RemovePdbsFromPortablePayload"
+          AfterTargets="ComputeFilesToPublish"
+          Condition="'$(WindowsPackageType)' == 'None' and '$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Extension)' == '.pdb'" />
     </ItemGroup>
   </Target>
 </Project>

@@ -83,7 +83,7 @@ internal static class BeautifyRenderer
         using var stream = new InMemoryRandomAccessStream();
         await target.SaveAsync(stream, CanvasBitmapFileFormat.Png, 1).AsTask(cancellationToken);
         byte[] png = await ReadAllAsync(stream, cancellationToken);
-        return new RenderedImage(png, layout.Canvas.Width, layout.Canvas.Height);
+        return RenderedImage.FromOwnedPng(png, layout.Canvas.Width, layout.Canvas.Height);
     }
 
     private static ImageSample SampleImage(CanvasDevice device, CanvasBitmap source)
@@ -107,15 +107,15 @@ internal static class BeautifyRenderer
         }
 
         byte[] bytes = sample.GetPixelBytes();
-        long red = 0;
-        long green = 0;
-        long blue = 0;
+        double red = 0;
+        double green = 0;
+        double blue = 0;
         ulong hash = 1469598103934665603;
         for (int index = 0; index < bytes.Length; index += 4)
         {
-            blue += bytes[index];
-            green += bytes[index + 1];
-            red += bytes[index + 2];
+            blue += SrgbToLinear(bytes[index] / 255d);
+            green += SrgbToLinear(bytes[index + 1] / 255d);
+            red += SrgbToLinear(bytes[index + 2] / 255d);
             hash = (hash ^ bytes[index + 2]) * 1099511628211;
             hash = (hash ^ bytes[index + 1]) * 1099511628211;
             hash = (hash ^ bytes[index]) * 1099511628211;
@@ -124,9 +124,9 @@ internal static class BeautifyRenderer
         int pixels = checked(sampleSize * sampleSize);
         return new ImageSample(
             new Rgba(
-                checked((byte)(red / pixels)),
-                checked((byte)(green / pixels)),
-                checked((byte)(blue / pixels))),
+                LinearToSrgbByte(red / pixels),
+                LinearToSrgbByte(green / pixels),
+                LinearToSrgbByte(blue / pixels)),
             hash);
     }
 
@@ -156,6 +156,20 @@ internal static class BeautifyRenderer
         Span<byte> bytes = stackalloc byte[sizeof(uint)];
         RandomNumberGenerator.Fill(bytes);
         return BitConverter.ToUInt32(bytes);
+    }
+
+    private static double SrgbToLinear(double value) =>
+        value <= 0.04045
+            ? value / 12.92
+            : Math.Pow((value + 0.055) / 1.055, 2.4);
+
+    private static byte LinearToSrgbByte(double value)
+    {
+        double clamped = Math.Clamp(value, 0, 1);
+        double encoded = clamped <= 0.0031308
+            ? clamped * 12.92
+            : (1.055 * Math.Pow(clamped, 1 / 2.4)) - 0.055;
+        return (byte)Math.Round(encoded * 255, MidpointRounding.AwayFromZero);
     }
 
     private static void SetGradientDirection(

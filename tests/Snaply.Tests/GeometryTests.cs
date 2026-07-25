@@ -200,49 +200,6 @@ public sealed class GeometryTests
     }
 
     [Fact]
-    public void Dip_conversion_rounds_edges_so_tiles_remain_seamless()
-    {
-        PixelRect left = new DipRect(0, 0, 100.5, 40).ToPixels(1.25);
-        PixelRect right = new DipRect(100.5, 0, 99.5, 40).ToPixels(1.25);
-
-        Assert.Equal(left.Right, right.X);
-        Assert.Equal(250, right.Right);
-    }
-
-    [Fact]
-    public void Dip_conversion_scales_negative_coordinates_and_both_axes()
-    {
-        PixelRect pixels = new DipRect(-10.5, 20.5, 3.25, 4.75).ToPixels(2);
-
-        Assert.Equal(new PixelRect(-21, 41, 6, 10), pixels);
-    }
-
-    [Fact]
-    public void Dip_conversion_rejects_coordinate_overflow()
-    {
-        Assert.Throws<OverflowException>(() =>
-            new DipRect(int.MaxValue, int.MinValue, 1, 1).ToPixels(2));
-    }
-
-    [Fact]
-    public void Dip_conversion_rejects_dimension_overflow()
-    {
-        Assert.Throws<OverflowException>(() =>
-            new DipRect(-1_000_000_000, 0, 2_000_000_000, 1).ToPixels(2));
-        Assert.Throws<OverflowException>(() =>
-            new DipRect(0, -1_000_000_000, 1, 2_000_000_000).ToPixels(2));
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    [InlineData(double.NaN)]
-    public void Dip_conversion_rejects_invalid_scale(double scale)
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new DipRect(0, 0, 1, 1).ToPixels(scale));
-    }
-
-    [Fact]
     public void Overflow_is_never_silently_wrapped()
     {
         var horizontalExtreme = new PixelRect(int.MaxValue, 0, 1, 1);

@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
       - uses: crate-ci/typos@bee27e3a4fd1ea2111cf90ab89cd076c870fce14 # v1.47.2
+      - uses: fsfe/reuse-action@772649cfa03a64a08c458c7cca9a6a473d74e7f9 # v6
       - name: Reject incomplete implementation markers
         shell: bash
         run: |
@@ -36,7 +37,7 @@ jobs:
 
   quality:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -44,54 +45,9 @@ jobs:
           global-json-file: global.json
           cache: true
           cache-dependency-path: "**/packages.lock.json"
-      - name: Restore locked dependencies
-        run: dotnet restore Snaply.slnx --locked-mode
-      # Clear PathMap for this coverage build only: CI's PathMap (/_/) otherwise breaks
-      # coverlet's source resolution and makes it report 0% line coverage.
-      - name: Test imaging
-        run: >-
-          dotnet test tests/Snaply.Tests/Snaply.Tests.csproj
-          -c Release --no-restore
-          -p:PathMap=
-          --collect:"XPlat Code Coverage"
-          --logger "trx;LogFileName=results.trx"
-          --results-directory artifacts/test
-      - name: Test filesystem workflows
-        run: >-
-          dotnet test tests/Snaply.App.Tests/Snaply.App.Tests.csproj
-          -c Release --no-restore
-          --logger "trx;LogFileName=results.trx"
-          --results-directory artifacts/app-test
-      - name: Reject skipped tests and low coverage
+      - name: Verify source, tests, coverage, and portable publishes
         shell: pwsh
-        run: |
-          [xml]$trx = Get-Content artifacts/test/results.trx -Raw
-          if ([int]$trx.TestRun.ResultSummary.Counters.notExecuted -ne 0) {
-            throw "Required tests were skipped."
-          }
-          [xml]$coverage = Get-Content (
-            Get-ChildItem artifacts/test -Recurse -Filter coverage.cobertura.xml |
-              Select-Object -First 1
-          ).FullName -Raw
-          if ([double]$coverage.coverage.'line-rate' -lt 0.85) {
-            throw "Line coverage is below 85%."
-          }
-          [xml]$appTrx = Get-Content artifacts/app-test/results.trx -Raw
-          if ([int]$appTrx.TestRun.ResultSummary.Counters.notExecuted -ne 0) {
-            throw "Required filesystem tests were skipped."
-          }
-      - name: Build x64
-        run: >-
-          dotnet build src/Snaply.App/Snaply.App.csproj
-          -c Release -p:Platform=x64 --no-restore
-      - name: Build ARM64
-        run: >-
-          dotnet build src/Snaply.App/Snaply.App.csproj
-          -c Release -p:Platform=ARM64 --no-restore
-      - name: Verify formatting
-        env:
-          Configuration: Release
-        run: dotnet format Snaply.slnx --verify-no-changes --no-restore
+        run: ./scripts/verify.ps1
 
   packaging:
     runs-on: windows-latest
@@ -100,17 +56,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
+          dotnet-version: 8.0.x
           global-json-file: global.json
           cache: true
           cache-dependency-path: "**/packages.lock.json"
       - name: Build and validate unsigned release payloads
         shell: pwsh
         run: |
-          [xml]$props = Get-Content Directory.Build.props -Raw
+          $version = (Get-Content version.txt -Raw).Trim()
           ./scripts/release.ps1 `
             -Action Build `
-            -Version "$($props.Project.PropertyGroup.Version)" `
+            -Version $version `
             -Publisher CN=Snaply `
+            -OutputRoot build/package-smoke
+          ./scripts/release.ps1 `
+            -Action Package `
+            -Version $version `
             -OutputRoot build/package-smoke
 
   # Aggregate gate the branch protection requires (context "ci-required"): green only

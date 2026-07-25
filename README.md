@@ -1,35 +1,11 @@
 # Snaply
 
-Snaply is a Windows screenshot tool. It captures a region, a window, or the
-entire virtual desktop, then places the capture on a randomized, image-derived
-gradient background.
+Snaply captures a region, window, or desktop, presents a zoomable polished preview, and automatically saves and copies the PNG.
 
-After each capture, Snaply opens a preview, copies a PNG to the clipboard, and
-saves the same PNG to `Pictures\Screenshots\Snaply`.
+1. Choose Region, Window, or Desktop.
+2. Capture; cancel with Esc when applicable.
+3. Find the PNG in `Pictures\Screenshots\Snaply` or paste it from the clipboard.
 
-## Usage
+Windows 11 24H2+ builds for x64 and ARM64 are published as signed MSIX and self-contained portable ZIPs in [GitHub Releases](https://github.com/P4suta/Snaply/releases). The UI supports English, Japanese, and Simplified Chinese.
 
-1. Open the Capture menu and choose Region, Window, or Desktop.
-2. For Region, drag to select across one or more displays. For Window, pick
-   from the system window picker.
-3. In the preview, scroll to zoom, drag to pan, and double-tap to fit. Use
-   Open Folder to open the save location.
-
-## Install
-
-Download the signed MSIX bundle or the self-contained x64/ARM64 portable ZIP
-from [GitHub Releases](https://github.com/P4suta/Snaply/releases). Portable
-builds require no .NET or Windows App SDK installation: extract the ZIP and run
-`Snaply.exe`.
-
-Snaply runs on Windows 11 24H2 or later on x64 and ARM64, in English, Japanese,
-and Simplified Chinese.
-
-## Privacy
-
-Snaply runs entirely on the local machine. It has no telemetry, network access,
-background service, tray process, global hotkey, or updater.
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE).
+Snaply is local-only: no network access or telemetry. Licensed under [Apache-2.0](LICENSE).

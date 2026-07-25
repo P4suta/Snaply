@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
-    <Version>0.1.1</Version>
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)version.txt').Trim())</Version>
+    <WindowsSdkPackageVersion>10.0.26100.87</WindowsSdkPackageVersion>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RestoreLockedMode Condition="'$(ContinuousIntegrationBuild)' == 'true'">true</RestoreLockedMode>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>

@@ -1,190 +1,249 @@
-using System.Runtime.InteropServices.WindowsRuntime;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.UI.Xaml.Media.Imaging;
 using Serilog;
-using Windows.Graphics.Imaging;
-using Windows.Storage.Streams;
 
 namespace Snaply;
 
+internal enum NoticeKind
+{
+    Information,
+    Success,
+    Warning,
+    Error,
+}
+
 internal sealed partial class MainViewModel : ObservableObject, IDisposable
 {
-    private readonly ScreenCaptureService _capture;
-    private readonly ImageExportService _export;
-    private CancellationTokenSource? _operation;
+    private readonly ICapturePipeline _capture;
+    private readonly CancellationTokenSource _lifetime = new();
+    private readonly IImageOutput _output;
+    private readonly Func<string, string> _text;
+    private RenderedImage? _lastImage;
+    private DeliveryOutcome _lastDelivery;
+    private bool _disposed;
+    private bool _operationRunning;
 
     [ObservableProperty]
-    internal partial WriteableBitmap? Preview { get; set; }
-
-    // The capture pill picks the mode; CaptureCommand runs whatever is selected.
-    [ObservableProperty]
-    internal partial CaptureMode SelectedMode { get; set; } = CaptureMode.Desktop;
+    internal partial RenderedImage? PreviewImage { get; set; }
 
     [ObservableProperty]
-    internal partial bool HasImage { get; set; }
+    internal partial CaptureMode SelectedMode { get; set; } = CaptureMode.Region;
 
     [ObservableProperty]
-    internal partial bool HasError { get; set; }
+    internal partial bool HasStatus { get; set; }
 
     [ObservableProperty]
-    internal partial string ErrorMessage { get; set; } = string.Empty;
+    internal partial string StatusMessage { get; set; } = string.Empty;
 
-    // Bumped on each successful automatic save; the view watches it to play the folder→green-check
-    // "saved" animation (that flip IS the save feedback — there is no toast).
     [ObservableProperty]
-    internal partial int SavedTick { get; set; }
+    internal partial NoticeKind StatusKind { get; set; }
+
+    [ObservableProperty]
+    internal partial bool CanRetry { get; set; }
 
     internal MainViewModel(
-        ScreenCaptureService capture,
-        ImageExportService export)
+        ICapturePipeline capture,
+        IImageOutput output,
+        Func<string, string>? text = null)
     {
         _capture = capture;
-        _export = export;
+        _output = output;
+        _text = text ?? ResourceText.Get;
     }
 
-    // AsyncRelayCommand refuses to run while an execution is in flight and reports that
-    // through CanExecute, so the bound pill disables itself for the duration and the view
-    // needs no separate busy flag or re-entrancy guard.
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanStartOperation))]
     private async Task CaptureAsync()
     {
-        HasError = false;
-        using var operation = new CancellationTokenSource();
-        _operation = operation;
-
+        using CancellationTokenSource operation = BeginOperation();
         try
         {
-            using CapturedFrame? frame = await _capture.CaptureAsync(SelectedMode, operation.Token);
-            if (frame is null)
+            ClearStatus();
+            RenderedImage? image = await _capture.CaptureAsync(SelectedMode, operation.Token);
+            operation.Token.ThrowIfCancellationRequested();
+            if (image is null)
             {
                 return;
             }
 
-            RenderedImage image = await BeautifyRenderer.RenderAsync(frame, operation.Token);
-            WriteableBitmap preview = await UpdatePreviewAsync(Preview, image, operation.Token);
-            Preview = preview;
-            HasImage = true;
-
-            Task<bool> save = TrySaveAutomaticallyAsync(image, operation.Token);
-            Task<bool> copy = TryCopyAsync(image, operation.Token);
-            await Task.WhenAll(save, copy);
-            if (await save)
-            {
-                SavedTick++;
-            }
+            PreviewImage = image;
+            _lastImage = image;
+            _lastDelivery = await _output.DeliverAsync(
+                image,
+                DeliveryRequest.All,
+                DateTimeOffset.Now,
+                operation.Token);
+            operation.Token.ThrowIfCancellationRequested();
+            ApplyDeliveryOutcome(_lastDelivery);
         }
         catch (OperationCanceledException)
         {
-            // Cancellation (Esc, or the window picker dismissed) is a normal outcome — nothing to surface.
         }
-        catch (Exception exception)
+        catch (Exception exception) when (IsOperationalFailure(exception))
         {
             LogFailure("Capture", exception);
-            ShowError("ErrorCapture");
+            ShowStatus("ErrorCapture", NoticeKind.Error, canRetry: false);
         }
         finally
         {
-            if (ReferenceEquals(_operation, operation))
-            {
-                _operation = null;
-            }
+            EndOperation();
         }
     }
 
-    internal void OpenFolder()
+    [RelayCommand(CanExecute = nameof(CanRetryDelivery))]
+    private async Task RetryDeliveryAsync()
     {
-        HasError = false;
+        if (_lastImage is null)
+        {
+            return;
+        }
+
+        DeliveryRequest request = _lastDelivery.FailedTargets;
+        if (request.IsEmpty)
+        {
+            return;
+        }
+
+        using CancellationTokenSource operation = BeginOperation();
         try
         {
-            _export.OpenCaptureDirectory();
+            ClearStatus();
+            DeliveryOutcome retried = await _output.DeliverAsync(
+                _lastImage,
+                request,
+                DateTimeOffset.Now,
+                operation.Token);
+            operation.Token.ThrowIfCancellationRequested();
+            _lastDelivery = Merge(_lastDelivery, retried, request);
+            ApplyDeliveryOutcome(_lastDelivery);
         }
-        catch (Exception exception)
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception) when (IsOperationalFailure(exception))
+        {
+            LogFailure("RetryDelivery", exception);
+            ShowStatus("StatusDeliveryFailed", NoticeKind.Error, canRetry: true);
+        }
+        finally
+        {
+            EndOperation();
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanOpenFolder))]
+    private void OpenFolder()
+    {
+        try
+        {
+            _output.OpenCaptureDirectory();
+        }
+        catch (Exception exception) when (IsOperationalFailure(exception))
         {
             LogFailure("OpenFolder", exception);
-            ShowError("ErrorOpenFolder");
+            ShowStatus("ErrorOpenFolder", NoticeKind.Error, canRetry: false);
         }
     }
 
     public void Dispose()
     {
-        _operation?.Cancel();
-        _operation?.Dispose();
-        _operation = null;
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        if (!_operationRunning)
+        {
+            _capture.Dispose();
+        }
+
+        NotifyCommandStates();
     }
 
-    private static async Task<WriteableBitmap> UpdatePreviewAsync(
-        WriteableBitmap? preview,
-        RenderedImage image,
-        CancellationToken cancellationToken)
+    private bool CanStartOperation() => !_disposed && !_operationRunning;
+
+    private bool CanRetryDelivery() => CanStartOperation() && CanRetry;
+
+    private bool CanOpenFolder() => !_disposed;
+
+    private CancellationTokenSource BeginOperation()
     {
-        using var stream = new InMemoryRandomAccessStream();
-        await stream.WriteAsync(image.Png.AsBuffer()).AsTask(cancellationToken);
-        stream.Seek(0);
-        BitmapDecoder decoder = await BitmapDecoder.CreateAsync(stream).AsTask(cancellationToken);
-        PixelDataProvider provider = await decoder.GetPixelDataAsync(
-            BitmapPixelFormat.Bgra8,
-            BitmapAlphaMode.Premultiplied,
-            new BitmapTransform(),
-            ExifOrientationMode.IgnoreExifOrientation,
-            ColorManagementMode.ColorManageToSRgb).AsTask(cancellationToken);
-        byte[] pixels = provider.DetachPixelData();
-        int expectedLength = checked(checked(image.Width * image.Height) * 4);
-        if (pixels.Length != expectedLength)
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_operationRunning)
         {
-            throw new InvalidDataException("Decoded preview dimensions are invalid.");
+            throw new InvalidOperationException("Another operation is already running.");
         }
 
-        WriteableBitmap bitmap = preview is not null
-            && preview.PixelWidth == image.Width
-            && preview.PixelHeight == image.Height
-                ? preview
-                : new WriteableBitmap(image.Width, image.Height);
-        using Stream buffer = bitmap.PixelBuffer.AsStream();
-        buffer.Position = 0;
-        await buffer.WriteAsync(pixels, cancellationToken);
-        await buffer.FlushAsync(cancellationToken);
-        bitmap.Invalidate();
-        return bitmap;
+        var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _operationRunning = true;
+        NotifyCommandStates();
+        return operation;
     }
 
-    private async Task<bool> TrySaveAutomaticallyAsync(
-        RenderedImage image,
-        CancellationToken cancellationToken)
+    private void EndOperation()
     {
-        try
+        _operationRunning = false;
+        if (_disposed)
         {
-            await _export.SaveAutomaticallyAsync(image, DateTimeOffset.Now, cancellationToken);
-            return true;
+            _capture.Dispose();
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+
+        NotifyCommandStates();
+    }
+
+    private void ApplyDeliveryOutcome(DeliveryOutcome outcome)
+    {
+        if (outcome.AllSucceeded)
         {
-            LogFailure("AutoSave", exception);
-            return false;
+            ShowStatus("StatusSavedAndCopied", NoticeKind.Success, canRetry: false);
+        }
+        else if (outcome.Save is DeliveryResult.Succeeded)
+        {
+            ShowStatus("StatusSavedCopyFailed", NoticeKind.Warning, canRetry: true);
+        }
+        else if (outcome.Clipboard is DeliveryResult.Succeeded)
+        {
+            ShowStatus("StatusCopiedSaveFailed", NoticeKind.Warning, canRetry: true);
+        }
+        else
+        {
+            ShowStatus("StatusDeliveryFailed", NoticeKind.Error, canRetry: true);
         }
     }
 
-    private static async Task<bool> TryCopyAsync(
-        RenderedImage image,
-        CancellationToken cancellationToken)
+    private void ClearStatus()
     {
-        try
-        {
-            await ImageExportService.CopyAsync(image, cancellationToken);
-            return true;
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            LogFailure("Clipboard", exception);
-            return false;
-        }
+        HasStatus = false;
+        CanRetry = false;
+        RetryDeliveryCommand.NotifyCanExecuteChanged();
     }
 
-    private void ShowError(string key)
+    private void ShowStatus(string key, NoticeKind kind, bool canRetry)
     {
-        ErrorMessage = ResourceText.Get(key);
-        HasError = true;
+        StatusMessage = _text(key);
+        StatusKind = kind;
+        CanRetry = canRetry;
+        HasStatus = true;
+        RetryDeliveryCommand.NotifyCanExecuteChanged();
     }
+
+    private void NotifyCommandStates()
+    {
+        CaptureCommand.NotifyCanExecuteChanged();
+        RetryDeliveryCommand.NotifyCanExecuteChanged();
+        OpenFolderCommand.NotifyCanExecuteChanged();
+    }
+
+    private static DeliveryOutcome Merge(
+        DeliveryOutcome previous,
+        DeliveryOutcome retried,
+        DeliveryRequest request) =>
+        new(
+            request.Save ? retried.Save : previous.Save,
+            request.Clipboard ? retried.Clipboard : previous.Clipboard);
 
     private static void LogFailure(string operation, Exception exception) =>
         Log.Warning(
@@ -192,4 +251,13 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
             operation,
             exception.GetType().FullName,
             exception.HResult);
+
+    private static bool IsOperationalFailure(Exception exception) =>
+        exception is ArgumentException
+        or ExternalException
+        or IOException
+        or InvalidOperationException
+        or NotSupportedException
+        or TimeoutException
+        or UnauthorizedAccessException;
 }

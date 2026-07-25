@@ -45,18 +45,52 @@ internal readonly record struct ColorPalette(Rgba Start, Rgba End, double AngleD
 
     private static Rgba OklchToRgba(double lightness, double chroma, double hueDegrees)
     {
+        (double red, double green, double blue) = ToLinearRgb(lightness, chroma, hueDegrees);
+        if (!IsInGamut(red, green, blue))
+        {
+            double lower = 0;
+            double upper = chroma;
+            for (int iteration = 0; iteration < 16; iteration++)
+            {
+                double candidate = (lower + upper) / 2;
+                (red, green, blue) = ToLinearRgb(lightness, candidate, hueDegrees);
+                if (IsInGamut(red, green, blue))
+                {
+                    lower = candidate;
+                }
+                else
+                {
+                    upper = candidate;
+                }
+            }
+
+            (red, green, blue) = ToLinearRgb(lightness, lower, hueDegrees);
+        }
+
+        return new Rgba(ToByte(red), ToByte(green), ToByte(blue));
+    }
+
+    private static (double Red, double Green, double Blue) ToLinearRgb(
+        double lightness,
+        double chroma,
+        double hueDegrees)
+    {
         double hue = hueDegrees * Math.PI / 180;
         double a = chroma * Math.Cos(hue);
         double b = chroma * Math.Sin(hue);
         double l = Math.Pow(lightness + (0.3963377774 * a) + (0.2158037573 * b), 3);
         double m = Math.Pow(lightness - (0.1055613458 * a) - (0.0638541728 * b), 3);
         double s = Math.Pow(lightness - (0.0894841775 * a) - (1.291485548 * b), 3);
-
-        return new Rgba(
-            ToByte((4.0767416621 * l) - (3.3077115913 * m) + (0.2309699292 * s)),
-            ToByte((-1.2684380046 * l) + (2.6097574011 * m) - (0.3413193965 * s)),
-            ToByte((-0.0041960863 * l) - (0.7034186147 * m) + (1.707614701 * s)));
+        return (
+            (4.0767416621 * l) - (3.3077115913 * m) + (0.2309699292 * s),
+            (-1.2684380046 * l) + (2.6097574011 * m) - (0.3413193965 * s),
+            (-0.0041960863 * l) - (0.7034186147 * m) + (1.707614701 * s));
     }
+
+    private static bool IsInGamut(double red, double green, double blue) =>
+        red is >= 0 and <= 1
+        && green is >= 0 and <= 1
+        && blue is >= 0 and <= 1;
 
     private static ulong MixSeed(ulong hash, uint salt)
     {

@@ -4,8 +4,9 @@ param(
     [ValidateSet('Build', 'Collect', 'Verify', 'Package')]
     [string]$Action,
 
+    [Parameter(Mandatory)]
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = '0.1.1',
+    [string]$Version,
 
     [string]$Publisher = 'CN=Snaply',
 
@@ -84,6 +85,43 @@ function Invoke-Checked {
     if ($LASTEXITCODE -ne 0) {
         throw "$FilePath failed with exit code $LASTEXITCODE"
     }
+}
+
+function Invoke-SbomTool {
+    param([string[]]$Arguments)
+
+    $manifest = Get-Content (Join-Path $root '.config\dotnet-tools.json') -Raw |
+        ConvertFrom-Json
+    $version = $manifest.tools.'microsoft.sbom.dotnettool'.version
+    $packages = if ($env:NUGET_PACKAGES) {
+        $env:NUGET_PACKAGES
+    }
+    else {
+        Join-Path $env:USERPROFILE '.nuget\packages'
+    }
+
+    $assembly = Join-Path $packages (
+        "microsoft.sbom.dotnettool\$version\tools\net8.0\any\Microsoft.Sbom.DotNetTool.dll")
+    if (-not (Test-Path -LiteralPath $assembly -PathType Leaf)) {
+        throw 'Microsoft SBOM Tool was not restored.'
+    }
+
+    $hosts = @(
+        (Get-Command dotnet -ErrorAction Stop).Source,
+        (Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'dotnet\dotnet.exe')
+    ) | Where-Object { $_ } | Select-Object -Unique
+    $dotnetHost = $hosts | Where-Object {
+        (Test-Path -LiteralPath $_ -PathType Leaf) -and
+        @(Get-ChildItem -LiteralPath (
+                Join-Path (Split-Path $_) 'shared\Microsoft.NETCore.App') `
+                -Directory -Filter '8.*' -ErrorAction SilentlyContinue).Count -gt 0
+    } | Select-Object -First 1
+    if (-not $dotnetHost) {
+        throw 'Microsoft SBOM Tool requires the .NET 8 runtime.'
+    }
+
+    Invoke-Checked $dotnetHost (@($assembly) + $Arguments)
 }
 
 function Get-PeMachine {
@@ -306,6 +344,16 @@ function Assert-Msix {
     if ($targetFamily.MinVersion -ne '10.0.26100.0') {
         throw 'MSIX minimum Windows version is incorrect.'
     }
+
+    foreach ($size in @(16, 24, 32, 48, 256)) {
+        foreach ($suffix in @('', '_altform-unplated', '_altform-lightunplated')) {
+            $asset = Join-Path $Scratch (
+                "Assets\Square44x44Logo.targetsize-$size$suffix.png")
+            if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) {
+                throw "MSIX is missing app-list asset '$([IO.Path]::GetFileName($asset))'."
+            }
+        }
+    }
 }
 
 function Copy-SigningStage {
@@ -524,7 +572,9 @@ function New-DeterministicZip {
 
 function Package-Release {
     $package = Join-Path $output 'package'
+    $sbomRoot = Join-Path $output 'package-sbom'
     Reset-Directory $package
+    Reset-Directory $sbomRoot
     foreach ($architecture in @('x64', 'arm64')) {
         New-DeterministicZip (Join-Path $output "portable\$architecture") `
             (Join-Path $package "snaply-v$Version-win-$architecture.zip")
@@ -535,12 +585,6 @@ function Package-Release {
     Copy-Item (Join-Path $root 'LICENSE') $package
     Copy-Item (Join-Path $root 'NOTICE') $package
     Copy-Item (Join-Path $output 'dependency-licenses.txt') $package
-
-    $sbom = Join-Path $output '_manifest\spdx_2.2\manifest.spdx.json'
-    if (-not (Test-Path -LiteralPath $sbom)) {
-        throw 'SPDX SBOM is missing.'
-    }
-    Copy-Item $sbom (Join-Path $package 'snaply.spdx.json')
 
     $hashes = Get-ChildItem -LiteralPath $package -File |
         Where-Object Name -ne 'SHA256SUMS.txt' |
@@ -554,6 +598,38 @@ function Package-Release {
         (Join-Path $package 'SHA256SUMS.txt'),
         $hashes,
         [System.Text.Encoding]::ASCII)
+
+    Invoke-Checked 'dotnet' @('tool', 'restore')
+    Invoke-SbomTool @(
+        'generate',
+        '-b', $package,
+        '-bc', $root,
+        '-m', $sbomRoot,
+        '-PackageName', 'Snaply',
+        '-pv', $Version,
+        '-ps', 'P4suta',
+        '-nsb', 'https://github.com/P4suta/Snaply',
+        '-mi', 'SPDX:2.2',
+        '-cd',
+        '--DirectoryExclusionList **/artifacts/** --DirectoryExclusionList **/build/**',
+        '-D', 'true',
+        '-V', 'Warning')
+    $manifestDirectory = Join-Path $sbomRoot '_manifest'
+    $validationReport = Join-Path $sbomRoot 'validation.json'
+    Invoke-SbomTool @(
+        'validate',
+        '-b', $package,
+        '-m', $manifestDirectory,
+        '-o', $validationReport,
+        '-mi', 'SPDX:2.2',
+        '-n',
+        '-V', 'Warning')
+    $sbom = Join-Path $manifestDirectory 'spdx_2.2\manifest.spdx.json'
+    if (-not (Test-Path -LiteralPath $sbom -PathType Leaf)) {
+        throw 'SPDX SBOM was not generated.'
+    }
+
+    Copy-Item $sbom (Join-Path $package 'snaply.spdx.json')
 }
 
 switch ($Action) {

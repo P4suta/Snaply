@@ -4,11 +4,14 @@ using Windows.Graphics;
 
 namespace Snaply;
 
-public sealed partial class MainWindow : Window
+internal sealed partial class MainWindow : Window, IDisposable
 {
     private const uint WdaExcludeFromCapture = 0x00000011;
+    private readonly MainPage _page;
+    private readonly MainViewModel _viewModel;
+    private bool _disposed;
 
-    internal MainWindow(MainViewModel viewModel, ScreenCaptureService capture)
+    internal MainWindow()
     {
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
@@ -25,8 +28,48 @@ public sealed partial class MainWindow : Window
         bool exclusionEnabled = SetWindowDisplayAffinity(handle, WdaExcludeFromCapture)
             && GetWindowDisplayAffinity(handle, out uint affinity)
             && affinity == WdaExcludeFromCapture;
-        capture.SetAppWindow(this, exclusionEnabled);
-        ContentHost.Children.Add(new MainPage(viewModel));
+
+        CapturePipeline? pipeline = null;
+        MainViewModel? viewModel = null;
+        MainPage? page = null;
+        try
+        {
+            pipeline = new CapturePipeline(this, exclusionEnabled);
+            viewModel = new MainViewModel(pipeline, new ImageExportService());
+            pipeline = null;
+            page = new MainPage(viewModel);
+            ContentHost.Children.Add(page);
+            Closed += OnClosed;
+
+            _viewModel = viewModel;
+            _page = page;
+            viewModel = null;
+            page = null;
+        }
+        finally
+        {
+            page?.Dispose();
+            viewModel?.Dispose();
+            pipeline?.Dispose();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _page.Dispose();
+        _viewModel.Dispose();
+    }
+
+    private void OnClosed(object sender, WindowEventArgs args)
+    {
+        Closed -= OnClosed;
+        Dispose();
     }
 
     [LibraryImport("user32.dll", SetLastError = true)]
