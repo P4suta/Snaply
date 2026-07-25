@@ -605,7 +605,7 @@ function Package-Release {
         '-b', $package,
         '-bc', $root,
         '-m', $sbomRoot,
-        '-pn', 'Snaply',
+        '-PackageName', 'Snaply',
         '-pv', $Version,
         '-ps', 'P4suta',
         '-nsb', 'https://github.com/P4suta/Snaply',
