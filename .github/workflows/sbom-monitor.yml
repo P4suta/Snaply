@@ -29,7 +29,7 @@ jobs:
           gh release download "$tag" --pattern 'snaply.spdx.json' --dir sbom
           echo "available=true" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - uses: taiki-e/install-action@3d7d7cd5ac7f994c1892ae0c06165095b9139094 # v2.85.1
+      - uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         if: steps.release.outputs.available == 'true'
         with:
           tool: osv-scanner@2.3.6
