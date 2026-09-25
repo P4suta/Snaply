@@ -1,0 +1,77 @@
+---
+# The one status check branch protection requires,
+# identical in every P4suta repository.
+# It waits until every other check on the head commit has finished,
+# then fails if any of them failed,
+# so the ruleset never has to list a repository's own job names.
+name: required
+
+on:
+  pull_request:
+
+permissions:
+  checks: read
+  statuses: read
+
+concurrency:
+  group: required-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  required:
+    name: required
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Wait for every other check, then fail if any failed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          api="repos/${REPO}/commits/${SHA}"
+          runs_jq='.check_runs[] | select(.name != "required")
+            | "\(.name)\t\(.status)\t\(.conclusion // "")"'
+          status_jq='.statuses[] | "\(.context)\t\(.state)"'
+          # Checks register within seconds of the pull request event.
+          sleep 45
+          previous=""
+          while :; do
+            runs=$(gh api --paginate "${api}/check-runs?filter=latest" \
+              --jq "${runs_jq}" | sort)
+            statuses=$(gh api "${api}/status" --jq "${status_jq}" | sort)
+            running=$(printf '%s\n' "${runs}" \
+              | awk -F'\t' 'NF && $2 != "completed"' | wc -l)
+            queued=$(printf '%s\n' "${statuses}" \
+              | awk -F'\t' 'NF && $2 == "pending"' | wc -l)
+            pending=$((running + queued))
+            snapshot="${runs}"$'\n'"${statuses}"
+            # Finish only when nothing is running,
+            # and nothing new appeared since the last look.
+            if [[ "${pending}" -eq 0 ]]; then
+              if [[ "${snapshot}" == "${previous}" ]]; then
+                break
+              fi
+              previous=${snapshot}
+            else
+              previous=""
+            fi
+            echo "waiting: ${pending} check(s) still running"
+            sleep 30
+          done
+          ok='^(success|neutral|skipped)$'
+          failed=$(
+            printf '%s\n' "${runs}" \
+              | awk -F'\t' -v ok="${ok}" 'NF && $3 !~ ok {print $1}'
+            printf '%s\n' "${statuses}" \
+              | awk -F'\t' 'NF && $2 != "success" {print $1}'
+          )
+          echo "checks seen:"
+          printf '%s\n' "${runs}" | awk -F'\t' 'NF {print "  " $1 ": " $3}'
+          printf '%s\n' "${statuses}" | awk -F'\t' 'NF {print "  " $1 ": " $2}'
+          if [[ -n "${failed}" ]]; then
+            echo "::error::failed checks:"
+            printf '  %s\n' "${failed}"
+            exit 1
+          fi
