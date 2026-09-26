@@ -1,5 +1,5 @@
 [tools]
-dotnet = "10.0.301"
+dotnet = "10.0.303"
 # Git-hook manager. `lefthook install` wires the commit-msg (committed) and
 # pre-commit (typos) hooks; pinning it here provisions it via `mise install`.
 lefthook = "2"
