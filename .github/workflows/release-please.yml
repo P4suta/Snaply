@@ -18,24 +18,46 @@ jobs:
     timeout-minutes: 10
     environment: release-please
     permissions:
+      id-token: write
       actions: write
       contents: write
       pull-requests: write
     env:
-      HAS_APP: ${{ secrets.RELEASE_PLEASE_CLIENT_ID != '' && secrets.RELEASE_PLEASE_PRIVATE_KEY != '' }}
+      HAS_APP: ${{ vars.DOPPLER_AUTOMATION_IDENTITY_ID != '' }}
     steps:
       - name: Require GitHub App configuration for manual runs
         if: ${{ github.event_name == 'workflow_dispatch' && env.HAS_APP != 'true' }}
         run: |
           echo "::error::release-please GitHub App credentials are not configured"
           exit 1
+      - name: Fetch automation credentials
+        id: doppler_automation_1
+        if: "env.HAS_APP == 'true'"
+        uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
+        with:
+          auth-method: oidc
+          doppler-identity-id: ${{ vars.DOPPLER_AUTOMATION_IDENTITY_ID }}
+          doppler-project: snaply
+          doppler-config: automation
+          inject-env-vars: false
+      - name: Reject missing or unresolved automation credentials
+        if: >-
+          ${{ steps.doppler_automation_1.outcome == 'success' && (
+          steps.doppler_automation_1.outputs.GITHUB_APP_CLIENT_ID == '' ||
+          startsWith(steps.doppler_automation_1.outputs.GITHUB_APP_CLIENT_ID, '${') ||
+          steps.doppler_automation_1.outputs.GITHUB_APP_PRIVATE_KEY == '' ||
+          startsWith(steps.doppler_automation_1.outputs.GITHUB_APP_PRIVATE_KEY, '${')
+          ) }}
+        shell: bash
+        run: exit 1
+
       - name: Mint GitHub App token
         id: app-token
         if: env.HAS_APP == 'true'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ secrets.RELEASE_PLEASE_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
+          client-id: ${{ steps.doppler_automation_1.outputs.GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ steps.doppler_automation_1.outputs.GITHUB_APP_PRIVATE_KEY }}
       - name: Update release pull request
         id: release
         if: env.HAS_APP == 'true'

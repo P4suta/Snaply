@@ -1,0 +1,115 @@
+---
+name: Verify credential access
+
+'on':
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: verify-credentials
+  cancel-in-progress: false
+
+jobs:
+  sign_windows_0:
+    name: Verify sign_windows access
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - name: Fetch sign_windows credentials
+        id: credentials
+        uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
+        with:
+          auth-method: oidc
+          doppler-identity-id: ${{ vars.DOPPLER_SIGN_WINDOWS_IDENTITY_ID }}
+          doppler-project: snaply
+          doppler-config: sign_windows
+          inject-env-vars: false
+      - name: Reject missing or unresolved sign_windows credentials
+        if: >-
+          ${{ steps.credentials.outcome == 'success' && (
+          steps.credentials.outputs.SSLDOTCOM_CREDENTIAL_ID == '' ||
+          startsWith(steps.credentials.outputs.SSLDOTCOM_CREDENTIAL_ID, '${') ||
+          steps.credentials.outputs.SSLDOTCOM_PASSWORD == '' ||
+          startsWith(steps.credentials.outputs.SSLDOTCOM_PASSWORD, '${') ||
+          steps.credentials.outputs.SSLDOTCOM_TOTP_SECRET == '' ||
+          startsWith(steps.credentials.outputs.SSLDOTCOM_TOTP_SECRET, '${') ||
+          steps.credentials.outputs.SSLDOTCOM_USERNAME == '' ||
+          startsWith(steps.credentials.outputs.SSLDOTCOM_USERNAME, '${')
+          ) }}
+        shell: bash
+        run: exit 1
+
+      - name: Attempt unrelated credential access
+        id: forbidden
+        continue-on-error: true
+        uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
+        with:
+          auth-method: oidc
+          doppler-identity-id: ${{ vars.DOPPLER_SIGN_WINDOWS_IDENTITY_ID }}
+          doppler-project: snaply
+          doppler-config: automation
+          inject-env-vars: false
+
+      - name: Reject unrelated credential access
+        if: ${{ always() && steps.forbidden.outcome != 'failure' }}
+        shell: bash
+        run: exit 1
+
+  automation_0:
+    name: Verify automation access
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: release-please
+    permissions:
+      id-token: write
+    steps:
+      - name: Fetch automation credentials
+        id: credentials
+        uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
+        with:
+          auth-method: oidc
+          doppler-identity-id: ${{ vars.DOPPLER_AUTOMATION_IDENTITY_ID }}
+          doppler-project: snaply
+          doppler-config: automation
+          inject-env-vars: false
+      - name: Reject missing or unresolved automation credentials
+        if: >-
+          ${{ steps.credentials.outcome == 'success' && (
+          steps.credentials.outputs.GITHUB_APP_CLIENT_ID == '' ||
+          startsWith(steps.credentials.outputs.GITHUB_APP_CLIENT_ID, '${') ||
+          steps.credentials.outputs.GITHUB_APP_PRIVATE_KEY == '' ||
+          startsWith(steps.credentials.outputs.GITHUB_APP_PRIVATE_KEY, '${')
+          ) }}
+        shell: bash
+        run: exit 1
+
+      - name: Verify a read-only repository token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          client-id: ${{ steps.credentials.outputs.GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ steps.credentials.outputs.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: read
+
+      - name: Attempt unrelated credential access
+        id: forbidden
+        continue-on-error: true
+        uses: dopplerhq/secrets-fetch-action@451892f16195f9ac360e1a5bcbf0b5fd0e957534
+        with:
+          auth-method: oidc
+          doppler-identity-id: ${{ vars.DOPPLER_AUTOMATION_IDENTITY_ID }}
+          doppler-project: snaply
+          doppler-config: sign_windows
+          inject-env-vars: false
+
+      - name: Reject unrelated credential access
+        if: ${{ always() && steps.forbidden.outcome != 'failure' }}
+        shell: bash
+        run: exit 1
