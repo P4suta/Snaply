@@ -101,19 +101,22 @@ try {
         '--no-restore')
     Invoke-Checked dotnet @(
         'test',
-        'tests/Snaply.Tests/Snaply.Tests.csproj',
+        '--project', 'tests/Snaply.Tests/Snaply.Tests.csproj',
         '-c', $Configuration,
         '--no-restore',
         '-p:PathMap=',
-        '--collect:XPlat Code Coverage',
-        '--logger', 'trx;LogFileName=results.trx',
+        '--coverlet',
+        '--coverlet-output-format', 'cobertura',
+        '--report-trx',
+        '--report-trx-filename', 'results.trx',
         '--results-directory', (Join-Path $testOutput 'imaging'))
     Invoke-Checked dotnet @(
         'test',
-        'tests/Snaply.App.Tests/Snaply.App.Tests.csproj',
+        '--project', 'tests/Snaply.App.Tests/Snaply.App.Tests.csproj',
         '-c', $Configuration,
         '--no-restore',
-        '--logger', 'trx;LogFileName=results.trx',
+        '--report-trx',
+        '--report-trx-filename', 'results.trx',
         '--results-directory', (Join-Path $testOutput 'app'))
 
     [xml]$imagingResults = Get-Content (
@@ -126,7 +129,7 @@ try {
     }
 
     $coveragePath = Get-ChildItem (Join-Path $testOutput 'imaging') `
-        -Recurse -Filter coverage.cobertura.xml -File |
+        -Recurse -Filter 'coverage.cobertura*.xml' -File |
         Select-Object -First 1
     if (-not $coveragePath) {
         throw 'Coverage report was not produced.'

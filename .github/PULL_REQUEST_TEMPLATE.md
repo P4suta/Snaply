@@ -7,7 +7,7 @@ Closes DEV-___
 
 ## Verification
 
-- [ ] `dotnet test tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore`
+- [ ] `dotnet test --project tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore`
 - [ ] x64 Release build has no warnings
 - [ ] `dotnet format Snaply.slnx --verify-no-changes --no-restore`
 - [ ] Updated lock files when dependencies changed
