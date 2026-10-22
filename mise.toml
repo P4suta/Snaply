@@ -2,14 +2,14 @@
 dotnet = "10.0.402"
 # Git-hook manager. `lefthook install` wires the commit-msg (committed) and
 # pre-commit (typos) hooks; pinning it here provisions it via `mise install`.
-lefthook = "2"
+lefthook = "2.2.2"
 # Conventional-Commits linter for the lefthook commit-msg hook — the local guard
 # that keeps release-please's version + CHANGELOG derivation fed with well-formed
 # commits. cargo backend, binstalled.
-"cargo:committed" = "1"
+"cargo:committed" = "1.1.11"
 # Typo linter for the lefthook pre-commit hook (config: _typos.toml); mirrors the
 # crate-ci/typos check in ci.yml so the local and CI signals match. cargo backend.
-"cargo:typos-cli" = "1"
+"cargo:typos-cli" = "1.51.1"
 
 [settings]
 experimental = true
