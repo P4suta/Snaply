@@ -1,4 +1,4 @@
-namespace Snaply.App.Tests;
+namespace Snaply.AppTests;
 
 public sealed class ImageExportServiceTests : IDisposable
 {

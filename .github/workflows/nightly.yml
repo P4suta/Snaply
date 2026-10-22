@@ -48,9 +48,9 @@ jobs:
           --locked-mode
           -p:Platform=${{ matrix.platform }}
           -p:PublishReadyToRun=true
-      - run: dotnet test tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore
+      - run: dotnet test --project tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore
       - run: >-
-          dotnet test tests/Snaply.App.Tests/Snaply.App.Tests.csproj
+          dotnet test --project tests/Snaply.App.Tests/Snaply.App.Tests.csproj
           -c Release
           -p:Platform=${{ matrix.platform }}
           --no-restore

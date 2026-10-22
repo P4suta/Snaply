@@ -124,7 +124,7 @@
                     VerticalAlignment="Center"
                     AutomationProperties.AutomationId="CaptureProgress"
                     IsHitTestVisible="False"
-                    IsActive="{x:Bind ViewModel.CaptureCommand.IsRunning, Mode=OneWay}" />
+                    IsActive="{x:Bind ViewModel.CaptureCommand.IsRunning, Mode=OneWay, FallbackValue=False}" />
 
                 <StackPanel
                     Margin="16"
