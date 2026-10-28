@@ -32,9 +32,19 @@ jobs:
         id: release
         shell: bash
         run: |
-          if ! tag=$(gh release view --json tagName --jq .tagName 2>/dev/null); then
+          if ! release_count=$(gh release list \
+            --limit 1 --exclude-drafts --exclude-pre-releases \
+            --json tagName --jq 'length'); then
+            echo "::error::Could not check for a published release."
+            exit 1
+          fi
+          if [[ "$release_count" == "0" ]]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+          if ! tag=$(gh release view --json tagName --jq .tagName); then
+            echo "::error::Could not resolve the latest published release."
+            exit 1
           fi
           sbom=$(gh release view "$tag" --json assets --jq 'if any(.assets[]; .name == "snaply.spdx.json") then "snaply.spdx.json" elif any(.assets[]; .name == "snaply.cdx.json") then "snaply.cdx.json" else "" end')
           if [[ -z "$sbom" ]]; then
@@ -63,9 +73,13 @@ jobs:
           osv-scanner scan source -L "sbom/$SBOM_NAME" \
             --config osv-scanner.toml --format markdown \
             --output osv-report.md || code=$?
+          if [[ "$code" != "0" && "$code" != "1" ]]; then
+            echo "::error::OSV-Scanner failed with exit code $code."
+            exit "$code"
+          fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Open vulnerability issue
-        if: steps.scan.outputs.code != '' && steps.scan.outputs.code != '0'
+        if: steps.scan.outputs.code == '1'
         shell: bash
         env:
           TAG: ${{ steps.release.outputs.tag }}
@@ -75,5 +89,5 @@ jobs:
             "$TAG" "$run_url")
           gh issue create --title "Vulnerability in shipped release $TAG" --body "$body"
       - name: Enforce scan result
-        if: steps.scan.outputs.code != '' && steps.scan.outputs.code != '0'
+        if: steps.scan.outputs.code == '1'
         run: exit 1
