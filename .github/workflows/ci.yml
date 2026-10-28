@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  push:
+  merge_group:
     branches: [main]
   pull_request:
     branches: [main]
@@ -20,13 +20,23 @@ env:
 
 jobs:
   hygiene:
+    name: hygiene
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: 2026.10.19
+          install_args: rust gh github:kjanat/actionlint
+      - name: Validate workflows
+        run: mise x -- actionlint
       - uses: crate-ci/typos@7f9d0819ca1c008ade73f4b41fa9d258d48f605b # v1.51.1
       - uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6
+      - name: Verify release publisher
+        run: mise run publisher-check
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -43,10 +53,13 @@ jobs:
           fi
 
   quality:
+    name: quality
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -57,10 +70,13 @@ jobs:
         run: ./scripts/verify.ps1
 
   packaging:
+    name: packaging
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 10.0.x
@@ -84,14 +100,17 @@ jobs:
   # Aggregate gate the branch protection requires (context "ci-required"): green only
   # when every CI job above succeeded. Keeps the required-checks list stable as jobs change.
   ci-required:
+    name: ci-required
     needs: [hygiene, quality, packaging]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require all CI jobs to succeed
+        env:
+          INCOMPLETE: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
         run: |
-          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then
+          if [ "$INCOMPLETE" = "true" ]; then
             echo "::error::a required CI job did not succeed"
             exit 1
           fi

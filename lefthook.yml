@@ -13,3 +13,5 @@ pre-commit:
     # local and CI signals match.
     typos:
       run: typos
+    publisher:
+      run: mise run publisher-check

@@ -4,6 +4,8 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$Version,
 
+    [string]$Publisher = 'CN=Snaply',
+
     [string]$OutputRoot = 'build/repro'
 )
 
@@ -85,14 +87,14 @@ Reset-BuildState
 & (Join-Path $PSScriptRoot 'release.ps1') `
     -Action Build `
     -Version $Version `
-    -Publisher 'CN=Snaply' `
+    -Publisher $Publisher `
     -OutputRoot $first
 
 Reset-BuildState
 & (Join-Path $PSScriptRoot 'release.ps1') `
     -Action Build `
     -Version $Version `
-    -Publisher 'CN=Snaply' `
+    -Publisher $Publisher `
     -OutputRoot $second
 
 $firstManifest = @(Get-PayloadManifest $first | Sort-Object)
