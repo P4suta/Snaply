@@ -1,5 +1,10 @@
 [tools]
 dotnet = "10.0.402"
+rust = { version = "1.99.1", components = ["clippy", "rustfmt"] }
+gh = "2.103.3"
+"cargo:kani-verifier" = { version = "0.68.0", os = ["linux", "macos"] }
+"cargo:cargo-audit" = "0.22.2"
+"github:kjanat/actionlint" = "1.17.0"
 # Git-hook manager. `lefthook install` wires the commit-msg (committed) and
 # pre-commit (typos) hooks; pinning it here provisions it via `mise install`.
 lefthook = "2.2.2"
@@ -16,3 +21,29 @@ experimental = true
 # Fetch cargo: backend tools as prebuilt binaries (cargo-binstall) rather than
 # `cargo install` from source — much faster locally and in CI.
 cargo.binstall = true
+
+[tasks.publisher-check]
+run = [
+  "cargo fmt --manifest-path tools/release-publisher/Cargo.toml --all -- --check",
+  "cargo clippy --manifest-path tools/release-publisher/Cargo.toml --locked --all-targets -- -D warnings",
+  "cargo test --manifest-path tools/release-publisher/Cargo.toml --locked --all-targets",
+]
+
+[tasks.publisher-proof]
+run = [
+  "cargo kani --manifest-path tools/release-publisher/Cargo.toml --lib --harness asset_policy_covers_all_inputs",
+  "cargo kani --manifest-path tools/release-publisher/Cargo.toml --lib --harness publication_requires_complete_verified_draft",
+  "cargo kani --manifest-path tools/release-publisher/Cargo.toml --lib --harness reject_reusing_mismatched_asset",
+  "cargo kani --manifest-path tools/release-publisher/Cargo.toml --lib --harness reject_publishing_incomplete_draft",
+  "cargo kani --manifest-path tools/release-publisher/Cargo.toml --lib --harness plan_reconciles_every_partial_draft",
+  "cargo kani --manifest-path tools/release-publisher/Cargo.toml --lib --harness plan_rejects_arbitrary_asset_byte_mismatches",
+  "cargo kani --manifest-path tools/release-publisher/Cargo.toml --lib --harness plan_refuses_invalid_release_inventory",
+  "cargo kani --manifest-path tools/release-publisher/Cargo.toml --lib --harness identity_accepts_exactly_lowercase_hex_sha_bytes",
+]
+
+[tasks.publisher-audit]
+run = [
+  "git clone --no-checkout --filter=blob:none https://github.com/RustSec/advisory-db build/publisher-advisories",
+  "git -C build/publisher-advisories checkout --detach 40f5be6fb12ed93fc591bf4ab23b7d793b3f2239",
+  "cargo audit --file tools/release-publisher/Cargo.lock --db build/publisher-advisories --no-fetch",
+]

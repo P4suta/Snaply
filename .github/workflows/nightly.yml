@@ -1,9 +1,21 @@
-name: nightly
+name: Extended checks
 
 on:
-  schedule:
-    - cron: "27 3 * * *"
+  workflow_call:
+    inputs:
+      sha:
+        description: Validated release commit SHA
+        required: true
+        type: string
+      publisher:
+        description: Validated MSIX package publisher
+        required: true
+        type: string
   workflow_dispatch:
+
+concurrency:
+  group: snaply-extended-${{ inputs.sha || github.sha }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -14,6 +26,22 @@ env:
   TESTINGPLATFORM_TELEMETRY_OPTOUT: "1"
 
 jobs:
+  publisher-proof:
+    name: publisher-proof
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: 2026.10.19
+          install_args: rust cargo:kani-verifier
+      - run: mise x -- cargo kani setup
+      - run: mise run publisher-proof
+
   native:
     name: native-${{ matrix.architecture }}
     strategy:
@@ -30,8 +58,18 @@ jobs:
             runner: windows-11-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      RID: ${{ matrix.rid }}
+      ARCHITECTURE: ${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -41,25 +79,24 @@ jobs:
       - uses: microsoft/setup-WinAppCli@b93bbddc1f7abc061ca0d3a8119e3a0c7dd71495
         with:
           version: v0.3.1
-      # Restore with ReadyToRun on so the crossgen2 runtime pack is fetched here; the
-      # publish below runs --no-restore, so without it R2R fails (NETSDK1094).
+      - run: dotnet restore Snaply.slnx --locked-mode
       - run: >-
-          dotnet restore Snaply.slnx
+          dotnet restore tests/Snaply.App.Tests/Snaply.App.Tests.csproj
           --locked-mode
-          -p:Platform=${{ matrix.platform }}
-          -p:PublishReadyToRun=true
+          -p:Configuration=Release
+          -p:Platform=$env:PLATFORM
       - run: dotnet test --project tests/Snaply.Tests/Snaply.Tests.csproj -c Release --no-restore
       - run: >-
           dotnet test --project tests/Snaply.App.Tests/Snaply.App.Tests.csproj
           -c Release
-          -p:Platform=${{ matrix.platform }}
+          -p:Platform=$env:PLATFORM
           --no-restore
       - name: Publish native portable payload
         run: >-
           dotnet publish src/Snaply.App/Snaply.App.csproj
           -c Release
-          -r ${{ matrix.rid }}
-          -p:Platform=${{ matrix.platform }}
+          -r $env:RID
+          -p:Platform=$env:PLATFORM
           -p:WindowsPackageType=None
           --self-contained true
           -o build/native
@@ -72,7 +109,7 @@ jobs:
             try {
               ./src/Snaply.App/ui-tests.ps1 `
                 -AppPid $process.Id `
-                -Architecture ${{ matrix.architecture }}
+                -Architecture $env:ARCHITECTURE
               if ($LASTEXITCODE -ne 0) { throw "UI pass $_ failed." }
             }
             finally {
@@ -89,7 +126,7 @@ jobs:
           try {
             ./src/Snaply.App/ui-tests.ps1 `
               -AppPid $process.Id `
-              -Architecture ${{ matrix.architecture }} `
+              -Architecture $env:ARCHITECTURE `
               -SoakIterations 100
             if ($LASTEXITCODE -ne 0) { throw "Soak failed." }
             if (@(Get-NetTCPConnection -OwningProcess $process.Id -ErrorAction SilentlyContinue).Count) {
@@ -122,25 +159,22 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path artifacts/ui/app-logs | Out-Null
           Copy-Item "$logs\*" artifacts/ui/app-logs -Recurse -Force
-      # Only reached when build, unit tests, UI journeys, and soak passed on the
-      # native runner for this architecture.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: nightly-${{ matrix.architecture }}
-          path: build/native
-          retention-days: 14
-          if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: ui-${{ matrix.architecture }}
           path: artifacts/ui
-          if-no-files-found: error
+          retention-days: 7
+          if-no-files-found: warn
   mutation:
+    name: mutation
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -161,13 +195,18 @@ jobs:
         with:
           name: mutation-report
           path: tests/Snaply.Tests/StrykerOutput/**/reports/mutation-report.html
+          retention-days: 7
           if-no-files-found: error
 
   reproducibility:
+    name: reproducibility
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
@@ -175,6 +214,8 @@ jobs:
           cache-dependency-path: "**/packages.lock.json"
       - name: Build twice
         shell: pwsh
+        env:
+          MSIX_PUBLISHER: ${{ inputs.publisher || 'CN=Snaply' }}
         run: |
           $version = (Get-Content version.txt -Raw).Trim()
-          ./scripts/test-reproducibility.ps1 -Version $version
+          ./scripts/test-reproducibility.ps1 -Version $version -Publisher $env:MSIX_PUBLISHER
