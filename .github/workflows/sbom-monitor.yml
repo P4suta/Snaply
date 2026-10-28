@@ -1,23 +1,34 @@
 name: sbom-monitor
 
 on:
+  # Recheck immutable release contents for advisories disclosed after publication.
   schedule:
     - cron: "7 5 * * 1"
   workflow_dispatch:
 
+concurrency:
+  group: sbom-monitor-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
-  issues: write
 
 jobs:
   rescan:
+    name: Rescan shipped SBOM
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Read release assets and open an issue only when the scan finds a vulnerability.
+    permissions:
+      contents: read
+      issues: write # Open an issue when the published artifact scan finds a vulnerability.
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Download latest release SBOM
+        with:
+          persist-credentials: false
+      - name: Download published release SBOM
         id: release
         shell: bash
         run: |
@@ -25,10 +36,18 @@ jobs:
             echo "available=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          sbom=$(gh release view "$tag" --json assets --jq 'if any(.assets[]; .name == "snaply.spdx.json") then "snaply.spdx.json" elif any(.assets[]; .name == "snaply.cdx.json") then "snaply.cdx.json" else "" end')
+          if [[ -z "$sbom" ]]; then
+            echo "::error::Release $tag has no supported SBOM asset."
+            exit 1
+          fi
           mkdir -p sbom
-          gh release download "$tag" --pattern 'snaply.spdx.json' --dir sbom
-          echo "available=true" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          gh release download "$tag" --pattern "$sbom" --dir sbom
+          {
+            echo "available=true"
+            echo "tag=$tag"
+            echo "sbom=$sbom"
+          } >> "$GITHUB_OUTPUT"
       - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
         if: steps.release.outputs.available == 'true'
         with:
@@ -36,10 +55,12 @@ jobs:
       - name: Scan shipped SBOM
         id: scan
         if: steps.release.outputs.available == 'true'
+        env:
+          SBOM_NAME: ${{ steps.release.outputs.sbom }}
         shell: bash
         run: |
           code=0
-          osv-scanner scan source -L sbom/snaply.spdx.json \
+          osv-scanner scan source -L "sbom/$SBOM_NAME" \
             --config osv-scanner.toml --format markdown \
             --output osv-report.md || code=$?
           echo "code=$code" >> "$GITHUB_OUTPUT"
@@ -49,8 +70,9 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           body=$(printf 'The shipped SBOM for %s failed the current OSV scan.\n\n%s' \
-            "$TAG" "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
+            "$TAG" "$run_url")
           gh issue create --title "Vulnerability in shipped release $TAG" --body "$body"
       - name: Enforce scan result
         if: steps.scan.outputs.code != '' && steps.scan.outputs.code != '0'
