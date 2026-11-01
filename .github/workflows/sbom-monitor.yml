@@ -58,7 +58,7 @@ jobs:
             echo "tag=$tag"
             echo "sbom=$sbom"
           } >> "$GITHUB_OUTPUT"
-      - uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         if: steps.release.outputs.available == 'true'
         with:
           tool: osv-scanner@2.3.6
