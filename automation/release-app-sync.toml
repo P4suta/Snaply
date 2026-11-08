@@ -1,0 +1,13 @@
+workplace = "8f95af89faf8535b63a6"
+repository = "P4suta/Snaply"
+repository_id = 1289878492
+owner_id = 42543015
+environment = "release-please"
+branches = ["main"]
+project = "snaply"
+source_config = "automation"
+config = "github_automation"
+
+[fields]
+RELEASE_PLEASE_CLIENT_ID = "GITHUB_APP_CLIENT_ID"
+RELEASE_PLEASE_PRIVATE_KEY = "GITHUB_APP_PRIVATE_KEY"
