@@ -23,6 +23,8 @@ jobs:
     name: hygiene
     runs-on: ubuntu-26.04
     timeout-minutes: 10
+    env:
+      MISE_ENABLE_TOOLS: rust,gh,github:kjanat/actionlint
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -97,8 +99,8 @@ jobs:
             -Version $version `
             -OutputRoot build/package-smoke
 
-  # Aggregate gate the branch protection requires (context "ci-required"): green only
-  # when every CI job above succeeded. Keeps the required-checks list stable as jobs change.
+  # Aggregate gate the branch protection requires (context "ci-required"): green only when every CI job above succeeded.
+  # Keeps the required-checks list stable as jobs change.
   ci-required:
     name: ci-required
     needs: [hygiene, quality, packaging]
