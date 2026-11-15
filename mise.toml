@@ -1,9 +1,9 @@
 [tools]
-rust = { version = "1.99.1", components = ["clippy", "rustfmt"] }
+rust = { version = "1.100.0", components = ["clippy", "rustfmt"] }
 gh = "2.103.3"
 "cargo:kani-verifier" = { version = "0.68.0", os = ["linux", "macos"] }
-"cargo:cargo-audit" = "0.22.2"
-"github:kjanat/actionlint" = "1.17.0"
+"cargo:cargo-audit" = "0.23.0"
+"github:kjanat/actionlint" = "1.17.1"
 # Git-hook manager.
 # `lefthook install` wires the commit-msg (committed) and pre-commit (typos) hooks; pinning it here provisions it via `mise install`.
 lefthook = "2.2.2"
@@ -12,7 +12,7 @@ lefthook = "2.2.2"
 "cargo:committed" = "1.1.12"
 # Typo linter for the lefthook pre-commit hook (config: _typos.toml); mirrors the crate-ci/typos check in ci.yml so the local and CI signals match.
 # cargo backend.
-"cargo:typos-cli" = "1.52.0"
+"cargo:typos-cli" = "1.52.2"
 
 [settings]
 idiomatic_version_file_enable_tools = ["dotnet"]
