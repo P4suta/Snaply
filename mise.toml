@@ -1,6 +1,6 @@
 [tools]
 rust = { version = "1.100.0", components = ["clippy", "rustfmt"] }
-gh = "2.103.3"
+gh = "2.105.0"
 "cargo:kani-verifier" = { version = "0.68.0", os = ["linux", "macos"] }
 "cargo:cargo-audit" = "0.23.0"
 "github:kjanat/actionlint" = "1.17.1"
