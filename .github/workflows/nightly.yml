@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5
         with:
-          version: 2026.11.7
+          version: 2026.11.10
           install_args: rust cargo:kani-verifier
       - run: mise x -- cargo kani setup
       - run: mise run publisher-proof
