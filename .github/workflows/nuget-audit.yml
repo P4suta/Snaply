@@ -47,7 +47,7 @@ jobs:
             foreach ($project in $report.projects) {
               foreach ($framework in $project.frameworks) {
                 @($framework.topLevelPackages) + @($framework.transitivePackages) |
-                  Where-Object { @($_.vulnerabilities).Count -gt 0 }
+                  Where-Object { $_.vulnerabilities.Count -gt 0 }
               }
             }
           )
@@ -69,7 +69,7 @@ jobs:
             foreach ($project in $report.projects) {
               foreach ($framework in $project.frameworks) {
                 @($framework.topLevelPackages) + @($framework.transitivePackages) |
-                  Where-Object { @($_.deprecationReasons).Count -gt 0 }
+                  Where-Object { $_.deprecationReasons.Count -gt 0 }
               }
             }
           )
